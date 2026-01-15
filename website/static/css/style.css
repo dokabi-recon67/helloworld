@@ -317,6 +317,39 @@ section h2 {
     color: var(--accent);
 }
 
+/* Cloud-init download box */
+.cloud-init-box {
+    background: linear-gradient(135deg, rgba(0, 255, 136, 0.08), rgba(0, 204, 255, 0.08));
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    padding: 20px;
+    margin-top: 16px;
+    text-align: center;
+}
+
+.cloud-init-box h4 {
+    color: var(--accent);
+    margin-bottom: 10px;
+    font-size: 1rem;
+}
+
+.cloud-init-box p {
+    margin-bottom: 14px;
+    font-size: 0.9rem;
+}
+
+.cloud-init-box .btn-download {
+    display: inline-block;
+    margin: 8px 0;
+}
+
+.cloud-init-box .small-note {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 10px;
+    margin-bottom: 0;
+}
+
 /* Advanced Section */
 .advanced-section {
     max-width: 800px;

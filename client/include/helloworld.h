@@ -94,6 +94,10 @@ typedef struct {
     char error_msg[256];
 } hw_ctx_t;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 hw_ctx_t* hw_create(void);
 void hw_destroy(hw_ctx_t* ctx);
 
@@ -118,5 +122,9 @@ int hw_clear_full_tunnel(hw_ctx_t* ctx);
 
 const char* hw_status_str(hw_status_t status);
 void hw_log(const char* level, const char* fmt, ...);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

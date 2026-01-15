@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
-project(helloworld C)
+project(helloworld C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 17)
 
 set(SOURCES
     src/core.c
@@ -12,9 +13,9 @@ set(SOURCES
 )
 
 if(WIN32)
-    list(APPEND SOURCES src/gui_win32.c)
+    list(APPEND SOURCES src/gui_win32.cpp)
     add_executable(helloworld WIN32 ${SOURCES})
-    target_link_libraries(helloworld ws2_32 wininet shell32 comctl32)
+    target_link_libraries(helloworld ws2_32 wininet shell32 comctl32 gdiplus)
     target_compile_definitions(helloworld PRIVATE _CRT_SECURE_NO_WARNINGS)
 elseif(APPLE)
     list(APPEND SOURCES src/gui_macos.m)

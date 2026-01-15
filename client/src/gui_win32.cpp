@@ -1,6 +1,6 @@
 /*
  * HelloWorld - Windows GUI
- * Modern UI with Toggle Switches, Tutorial, Add Server Dialog
+ * Modern UI with Smooth Graphics (GDI+), Toggle Switches, Eye Icon
  */
 
 #ifdef _WIN32
@@ -11,11 +11,16 @@
 #include <windowsx.h>
 #include <shlobj.h>
 #include <wchar.h>
+#include <objidl.h>
+#include <gdiplus.h>
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "gdi32.lib")
 #pragma comment(lib, "uxtheme.lib")
 #pragma comment(lib, "comdlg32.lib")
 #pragma comment(lib, "wininet.lib")
+#pragma comment(lib, "gdiplus.lib")
+
+using namespace Gdiplus;
 
 #define ID_TIMER_UPDATE  2001
 
@@ -31,8 +36,12 @@
 #define CLR_TOGGLE_OFF   RGB(60, 65, 75)
 #define CLR_TOGGLE_ON    RGB(0, 200, 100)
 
+static inline POINT MakePt(int x, int y) { POINT p = {x, y}; return p; }
+
+static ULONG_PTR g_gdiplusToken = 0;
 static hw_ctx_t* g_ctx = NULL;
 static HWND g_hwnd = NULL;
+static HICON g_icon = NULL;
 static HFONT g_font_title = NULL;
 static HFONT g_font_normal = NULL;
 static HFONT g_font_button = NULL;
@@ -47,7 +56,6 @@ static int g_full_tunnel = 0;
 static int g_kill_switch = 0;
 static int g_show_tutorial = 0;
 static int g_tutorial_step = 0;
-static char g_server_location[128] = "";
 
 static RECT g_rect_title;
 static RECT g_rect_server_label;
@@ -112,6 +120,64 @@ static const char* TUTORIAL_TEXTS[] = {
     "Enjoy your private, secure tunnel!"
 };
 
+static HICON create_eye_icon(int size) {
+    HDC screenDC = GetDC(NULL);
+    HDC memDC = CreateCompatibleDC(screenDC);
+    
+    BITMAPINFO bmi = {0};
+    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bmi.bmiHeader.biWidth = size;
+    bmi.bmiHeader.biHeight = size;
+    bmi.bmiHeader.biPlanes = 1;
+    bmi.bmiHeader.biBitCount = 32;
+    bmi.bmiHeader.biCompression = BI_RGB;
+    
+    void* bits = NULL;
+    HBITMAP hbmColor = CreateDIBSection(memDC, &bmi, DIB_RGB_COLORS, &bits, NULL, 0);
+    HBITMAP hbmMask = CreateBitmap(size, size, 1, 1, NULL);
+    
+    SelectObject(memDC, hbmColor);
+    
+    Graphics g(memDC);
+    g.SetSmoothingMode(SmoothingModeAntiAlias);
+    g.Clear(Color(0, 0, 0, 0));
+    
+    int cx = size / 2;
+    int cy = size / 2;
+    int ew = size * 4 / 5;
+    int eh = size * 2 / 5;
+    
+    SolidBrush accentBrush(Color(255, 0, 255, 136));
+    SolidBrush whiteBrush(Color(255, 255, 255, 255));
+    SolidBrush blackBrush(Color(255, 13, 17, 23));
+    Pen outlinePen(Color(255, 0, 200, 100), 2.0f);
+    
+    g.FillEllipse(&accentBrush, cx - ew/2, cy - eh/2, ew, eh);
+    
+    int irisSize = size / 3;
+    g.FillEllipse(&whiteBrush, cx - irisSize/2, cy - irisSize/2, irisSize, irisSize);
+    
+    int pupilSize = size / 6;
+    g.FillEllipse(&blackBrush, cx - pupilSize/2, cy - pupilSize/2, pupilSize, pupilSize);
+    
+    int glintSize = size / 12;
+    g.FillEllipse(&whiteBrush, cx - pupilSize/4, cy - pupilSize/4, glintSize, glintSize);
+    
+    ICONINFO ii = {0};
+    ii.fIcon = TRUE;
+    ii.hbmMask = hbmMask;
+    ii.hbmColor = hbmColor;
+    
+    HICON icon = CreateIconIndirect(&ii);
+    
+    DeleteObject(hbmColor);
+    DeleteObject(hbmMask);
+    DeleteDC(memDC);
+    ReleaseDC(NULL, screenDC);
+    
+    return icon;
+}
+
 static void init_layout(int w, int h) {
     int margin = 20;
     int card_x = margin;
@@ -142,22 +208,74 @@ static void init_layout(int w, int h) {
     SetRect(&g_rect_info_box, card_x, y, card_x + card_w, h - margin);
 }
 
-static void draw_rounded_rect(HDC hdc, RECT* rc, int radius, COLORREF fill, COLORREF border) {
-    HPEN pen = CreatePen(PS_SOLID, 1, border);
-    HBRUSH brush = CreateSolidBrush(fill);
-    HPEN old_pen = SelectObject(hdc, pen);
-    HBRUSH old_brush = SelectObject(hdc, brush);
-    RoundRect(hdc, rc->left, rc->top, rc->right, rc->bottom, radius, radius);
-    SelectObject(hdc, old_pen);
-    SelectObject(hdc, old_brush);
-    DeleteObject(pen);
-    DeleteObject(brush);
+static void draw_rounded_rect_gdi(HDC hdc, RECT* rc, int radius, COLORREF fill, COLORREF border) {
+    Graphics g(hdc);
+    g.SetSmoothingMode(SmoothingModeAntiAlias);
+    
+    int r = GetRValue(fill), gr = GetGValue(fill), b = GetBValue(fill);
+    SolidBrush brush(Color(255, r, gr, b));
+    
+    int br = GetRValue(border), bg = GetGValue(border), bb = GetBValue(border);
+    Pen pen(Color(255, br, bg, bb), 1.0f);
+    
+    GraphicsPath path;
+    int x = rc->left, y = rc->top, w = rc->right - rc->left, h = rc->bottom - rc->top;
+    int d = radius * 2;
+    
+    path.AddArc(x, y, d, d, 180, 90);
+    path.AddArc(x + w - d, y, d, d, 270, 90);
+    path.AddArc(x + w - d, y + h - d, d, d, 0, 90);
+    path.AddArc(x, y + h - d, d, d, 90, 90);
+    path.CloseFigure();
+    
+    g.FillPath(&brush, &path);
+    g.DrawPath(&pen, &path);
+}
+
+static void draw_toggle_gdi(HDC hdc, RECT* rc, const char* label, int on, int hover) {
+    int toggle_w = 50;
+    int toggle_h = 26;
+    int toggle_x = rc->right - toggle_w;
+    int toggle_y = rc->top + (rc->bottom - rc->top - toggle_h) / 2;
+    
+    Graphics g(hdc);
+    g.SetSmoothingMode(SmoothingModeAntiAlias);
+    
+    COLORREF bg_clr = on ? CLR_TOGGLE_ON : CLR_TOGGLE_OFF;
+    if (hover) bg_clr = on ? CLR_ACCENT : RGB(80, 85, 95);
+    
+    int r = GetRValue(bg_clr), gr = GetGValue(bg_clr), b = GetBValue(bg_clr);
+    SolidBrush trackBrush(Color(255, r, gr, b));
+    
+    GraphicsPath track;
+    int radius = toggle_h / 2;
+    track.AddArc(toggle_x, toggle_y, toggle_h, toggle_h, 90, 180);
+    track.AddArc(toggle_x + toggle_w - toggle_h, toggle_y, toggle_h, toggle_h, 270, 180);
+    track.CloseFigure();
+    g.FillPath(&trackBrush, &track);
+    
+    int knob_size = toggle_h - 6;
+    int knob_x = on ? (toggle_x + toggle_w - knob_size - 3) : (toggle_x + 3);
+    int knob_y = toggle_y + 3;
+    
+    SolidBrush knobBrush(Color(255, 255, 255, 255));
+    g.FillEllipse(&knobBrush, knob_x, knob_y, knob_size, knob_size);
+    
+    Pen shadow(Color(40, 0, 0, 0), 1.0f);
+    g.DrawEllipse(&shadow, knob_x, knob_y, knob_size, knob_size);
+    
+    RECT label_rc = {rc->left, rc->top, toggle_x - 10, rc->bottom};
+    SetTextColor(hdc, on ? CLR_TEXT : CLR_TEXT_DIM);
+    SetBkMode(hdc, TRANSPARENT);
+    HFONT old = (HFONT)SelectObject(hdc, g_font_normal);
+    DrawTextA(hdc, label, -1, &label_rc, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    SelectObject(hdc, old);
 }
 
 static void draw_text_centered(HDC hdc, const char* text, RECT* rc, HFONT font, COLORREF color) {
     SetTextColor(hdc, color);
     SetBkMode(hdc, TRANSPARENT);
-    HFONT old = SelectObject(hdc, font);
+    HFONT old = (HFONT)SelectObject(hdc, font);
     DrawTextA(hdc, text, -1, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     SelectObject(hdc, old);
 }
@@ -165,39 +283,17 @@ static void draw_text_centered(HDC hdc, const char* text, RECT* rc, HFONT font, 
 static void draw_text_left(HDC hdc, const char* text, RECT* rc, HFONT font, COLORREF color) {
     SetTextColor(hdc, color);
     SetBkMode(hdc, TRANSPARENT);
-    HFONT old = SelectObject(hdc, font);
+    HFONT old = (HFONT)SelectObject(hdc, font);
     DrawTextA(hdc, text, -1, rc, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
     SelectObject(hdc, old);
 }
 
-static void draw_toggle(HDC hdc, RECT* rc, const char* label, int on, int hover) {
-    int toggle_w = 50;
-    int toggle_h = 26;
-    int toggle_x = rc->right - toggle_w;
-    int toggle_y = rc->top + (rc->bottom - rc->top - toggle_h) / 2;
-    
-    RECT toggle_rc = {toggle_x, toggle_y, toggle_x + toggle_w, toggle_y + toggle_h};
-    COLORREF bg_color = on ? CLR_TOGGLE_ON : CLR_TOGGLE_OFF;
-    if (hover) bg_color = on ? CLR_ACCENT : RGB(80, 85, 95);
-    draw_rounded_rect(hdc, &toggle_rc, toggle_h / 2, bg_color, bg_color);
-    
-    int knob_size = toggle_h - 6;
-    int knob_x = on ? (toggle_x + toggle_w - knob_size - 3) : (toggle_x + 3);
-    int knob_y = toggle_y + 3;
-    RECT knob_rc = {knob_x, knob_y, knob_x + knob_size, knob_y + knob_size};
-    draw_rounded_rect(hdc, &knob_rc, knob_size / 2, CLR_TEXT, CLR_TEXT);
-    
-    RECT label_rc = {rc->left, rc->top, toggle_x - 10, rc->bottom};
-    draw_text_left(hdc, label, &label_rc, g_font_normal, on ? CLR_TEXT : CLR_TEXT_DIM);
-}
-
 static void draw_info_box(HDC hdc, RECT* rc) {
-    draw_rounded_rect(hdc, rc, 12, CLR_BG_CARD, CLR_BORDER);
+    draw_rounded_rect_gdi(hdc, rc, 12, CLR_BG_CARD, CLR_BORDER);
     
     int pad = 16;
     int line_h = 22;
     int y = rc->top + pad;
-    
     RECT r;
     
     if (g_ctx && g_ctx->status == HW_CONNECTED) {
@@ -207,7 +303,7 @@ static void draw_info_box(HDC hdc, RECT* rc) {
         
         SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
         draw_text_left(hdc, "Connected", &r, g_font_normal, CLR_ACCENT);
-        y += line_h + 12;
+        y += line_h + 10;
         
         SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
         draw_text_left(hdc, "MODE", &r, g_font_small, CLR_TEXT_DIM);
@@ -216,7 +312,7 @@ static void draw_info_box(HDC hdc, RECT* rc) {
         SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
         const char* mode = g_ctx->mode == HW_MODE_FULL_TUNNEL ? "Full Tunnel (All Traffic)" : "Proxy Mode (SOCKS5)";
         draw_text_left(hdc, mode, &r, g_font_normal, CLR_TEXT);
-        y += line_h + 12;
+        y += line_h + 10;
         
         SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
         draw_text_left(hdc, "YOUR IP", &r, g_font_small, CLR_TEXT_DIM);
@@ -227,7 +323,7 @@ static void draw_info_box(HDC hdc, RECT* rc) {
         snprintf(ip_display, sizeof(ip_display), "%s", 
                  g_ctx->stats.public_ip[0] ? g_ctx->stats.public_ip : "Fetching...");
         draw_text_left(hdc, ip_display, &r, g_font_button, CLR_ACCENT);
-        y += line_h + 12;
+        y += line_h + 10;
         
         SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
         draw_text_left(hdc, "SERVER", &r, g_font_small, CLR_TEXT_DIM);
@@ -235,51 +331,45 @@ static void draw_info_box(HDC hdc, RECT* rc) {
         
         SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
         if (g_ctx->current_server >= 0 && g_ctx->current_server < g_ctx->server_count) {
-            char server_info[256];
-            snprintf(server_info, sizeof(server_info), "%s (%s)", 
-                     g_ctx->servers[g_ctx->current_server].name,
-                     g_ctx->servers[g_ctx->current_server].host);
-            draw_text_left(hdc, server_info, &r, g_font_normal, CLR_TEXT);
+            draw_text_left(hdc, g_ctx->servers[g_ctx->current_server].name, &r, g_font_normal, CLR_TEXT);
         }
-        y += line_h + 12;
+        y += line_h + 10;
         
         SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
         draw_text_left(hdc, "DURATION", &r, g_font_small, CLR_TEXT_DIM);
         y += 18;
         
-        SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
         time_t el = time(NULL) - g_ctx->stats.start_time;
         char dur[64];
         snprintf(dur, sizeof(dur), "%02d:%02d:%02d", (int)(el/3600), (int)((el%3600)/60), (int)(el%60));
+        SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
         draw_text_left(hdc, dur, &r, g_font_normal, CLR_TEXT);
-        
     } else {
         SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
         draw_text_left(hdc, "STATUS", &r, g_font_small, CLR_TEXT_DIM);
         y += 18;
         
-        SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
         const char* status = "Disconnected";
         COLORREF status_clr = CLR_TEXT_DIM;
         if (g_ctx && g_ctx->status == HW_CONNECTING) {
             status = "Connecting...";
             status_clr = CLR_TEXT;
         } else if (g_ctx && g_ctx->status == HW_ERROR) {
-            status = "Error - Check Settings";
+            status = "Error";
             status_clr = CLR_ERROR;
         }
+        SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
         draw_text_left(hdc, status, &r, g_font_normal, status_clr);
-        y += line_h + 20;
+        y += line_h + 16;
         
-        SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h * 3);
+        SetRect(&r, rc->left + pad, y, rc->right - pad, rc->bottom - pad);
         SetTextColor(hdc, CLR_TEXT_DIM);
         SetBkMode(hdc, TRANSPARENT);
-        HFONT old = SelectObject(hdc, g_font_small);
-        if (g_ctx && g_ctx->server_count == 0) {
-            DrawTextA(hdc, "No servers configured.\nClick + ADD to add your first server.", -1, &r, DT_LEFT | DT_WORDBREAK);
-        } else {
-            DrawTextA(hdc, "Select a server and click CONNECT\nto start your secure tunnel.", -1, &r, DT_LEFT | DT_WORDBREAK);
-        }
+        HFONT old = (HFONT)SelectObject(hdc, g_font_small);
+        const char* hint = g_ctx && g_ctx->server_count == 0 
+            ? "No servers configured.\nClick + ADD to add your server."
+            : "Select a server and click\nCONNECT to start.";
+        DrawTextA(hdc, hint, -1, &r, DT_LEFT | DT_WORDBREAK);
         SelectObject(hdc, old);
     }
 }
@@ -288,15 +378,14 @@ static void paint_main(HWND hwnd, HDC hdc) {
     RECT rc;
     GetClientRect(hwnd, &rc);
     
-    HBRUSH bg = CreateSolidBrush(CLR_BG_DARK);
-    FillRect(hdc, &rc, bg);
-    DeleteObject(bg);
+    Graphics g(hdc);
+    g.Clear(Color(255, 13, 17, 23));
     
     draw_text_centered(hdc, "HelloWorld", &g_rect_title, g_font_title, CLR_ACCENT);
     draw_text_left(hdc, "SERVER", &g_rect_server_label, g_font_small, CLR_TEXT_DIM);
     
-    draw_rounded_rect(hdc, &g_rect_server_box, 8, CLR_BG_INPUT, 
-                      g_hover_dropdown ? CLR_ACCENT : CLR_BORDER);
+    draw_rounded_rect_gdi(hdc, &g_rect_server_box, 8, CLR_BG_INPUT, 
+                          g_hover_dropdown ? CLR_ACCENT : CLR_BORDER);
     
     const char* server_name = "No servers - click + ADD";
     if (g_ctx && g_ctx->server_count > 0 && g_selected_server >= 0) {
@@ -311,14 +400,14 @@ static void paint_main(HWND hwnd, HDC hdc) {
     arrow_rc.left = arrow_rc.right - 28;
     draw_text_centered(hdc, g_dropdown_open ? "^" : "v", &arrow_rc, g_font_small, CLR_TEXT_DIM);
     
-    draw_rounded_rect(hdc, &g_rect_btn_add, 8, 
-                      g_hover_add ? CLR_ACCENT : CLR_BG_CARD,
-                      g_hover_add ? CLR_ACCENT : CLR_BORDER);
+    draw_rounded_rect_gdi(hdc, &g_rect_btn_add, 8, 
+                          g_hover_add ? CLR_ACCENT : CLR_BG_CARD,
+                          g_hover_add ? CLR_ACCENT : CLR_BORDER);
     draw_text_centered(hdc, "+ ADD", &g_rect_btn_add, g_font_small,
                        g_hover_add ? CLR_BG_DARK : CLR_ACCENT);
     
     if (g_dropdown_open && g_ctx && g_ctx->server_count > 0) {
-        draw_rounded_rect(hdc, &g_rect_server_dropdown, 8, CLR_BG_CARD, CLR_BORDER);
+        draw_rounded_rect_gdi(hdc, &g_rect_server_dropdown, 8, CLR_BG_CARD, CLR_BORDER);
         int item_h = 36;
         for (int i = 0; i < g_ctx->server_count && i < 3; i++) {
             RECT item_rc = {
@@ -331,7 +420,7 @@ static void paint_main(HWND hwnd, HDC hdc) {
             draw_text_left(hdc, g_ctx->servers[i].name, &item_rc, g_font_normal, clr);
             
             RECT host_rc = item_rc;
-            host_rc.top += 18;
+            host_rc.top += 16;
             draw_text_left(hdc, g_ctx->servers[i].host, &host_rc, g_font_small, CLR_TEXT_DIM);
         }
     }
@@ -340,26 +429,21 @@ static void paint_main(HWND hwnd, HDC hdc) {
     const char* btn_label;
     
     if (g_ctx && g_ctx->status == HW_CONNECTED) {
-        btn_bg = CLR_ERROR;
-        btn_border = CLR_ERROR;
-        btn_text_clr = CLR_TEXT;
+        btn_bg = CLR_ERROR; btn_border = CLR_ERROR; btn_text_clr = CLR_TEXT;
         btn_label = "DISCONNECT";
     } else if (g_ctx && g_ctx->status == HW_CONNECTING) {
-        btn_bg = CLR_BG_INPUT;
-        btn_border = CLR_BORDER;
-        btn_text_clr = CLR_TEXT_DIM;
+        btn_bg = CLR_BG_INPUT; btn_border = CLR_BORDER; btn_text_clr = CLR_TEXT_DIM;
         btn_label = "CONNECTING...";
     } else {
         btn_bg = g_hover_connect ? CLR_ACCENT_DARK : CLR_ACCENT;
-        btn_border = CLR_ACCENT;
-        btn_text_clr = CLR_BG_DARK;
+        btn_border = CLR_ACCENT; btn_text_clr = CLR_BG_DARK;
         btn_label = "CONNECT";
     }
-    draw_rounded_rect(hdc, &g_rect_btn_connect, 8, btn_bg, btn_border);
+    draw_rounded_rect_gdi(hdc, &g_rect_btn_connect, 8, btn_bg, btn_border);
     draw_text_centered(hdc, btn_label, &g_rect_btn_connect, g_font_button, btn_text_clr);
     
-    draw_toggle(hdc, &g_rect_toggle_full, "Full Tunnel Mode", g_full_tunnel, g_hover_toggle_full);
-    draw_toggle(hdc, &g_rect_toggle_kill, "Kill Switch", g_kill_switch, g_hover_toggle_kill);
+    draw_toggle_gdi(hdc, &g_rect_toggle_full, "Full Tunnel Mode", g_full_tunnel, g_hover_toggle_full);
+    draw_toggle_gdi(hdc, &g_rect_toggle_kill, "Kill Switch", g_kill_switch, g_hover_toggle_kill);
     
     draw_info_box(hdc, &g_rect_info_box);
 }
@@ -368,12 +452,11 @@ static void paint_tutorial(HWND hwnd, HDC hdc) {
     RECT rc;
     GetClientRect(hwnd, &rc);
     
-    HBRUSH bg = CreateSolidBrush(CLR_BG_DARK);
-    FillRect(hdc, &rc, bg);
-    DeleteObject(bg);
+    Graphics g(hdc);
+    g.Clear(Color(255, 13, 17, 23));
     
     RECT overlay = {16, 16, rc.right - 16, rc.bottom - 16};
-    draw_rounded_rect(hdc, &overlay, 16, CLR_BG_CARD, CLR_ACCENT);
+    draw_rounded_rect_gdi(hdc, &overlay, 16, CLR_BG_CARD, CLR_ACCENT);
     
     RECT title_rc = {32, 32, rc.right - 32, 76};
     draw_text_centered(hdc, TUTORIAL_TITLES[g_tutorial_step], &title_rc, g_font_title, CLR_ACCENT);
@@ -381,7 +464,7 @@ static void paint_tutorial(HWND hwnd, HDC hdc) {
     RECT text_rc = {40, 90, rc.right - 40, rc.bottom - 90};
     SetTextColor(hdc, CLR_TEXT);
     SetBkMode(hdc, TRANSPARENT);
-    HFONT old = SelectObject(hdc, g_font_normal);
+    HFONT old = (HFONT)SelectObject(hdc, g_font_normal);
     DrawTextA(hdc, TUTORIAL_TEXTS[g_tutorial_step], -1, &text_rc, DT_LEFT | DT_WORDBREAK);
     SelectObject(hdc, old);
     
@@ -391,12 +474,12 @@ static void paint_tutorial(HWND hwnd, HDC hdc) {
     draw_text_left(hdc, progress, &prog_rc, g_font_small, CLR_TEXT_DIM);
     
     RECT next_btn = {rc.right - 140, rc.bottom - 70, rc.right - 32, rc.bottom - 36};
-    draw_rounded_rect(hdc, &next_btn, 8, CLR_ACCENT, CLR_ACCENT);
+    draw_rounded_rect_gdi(hdc, &next_btn, 8, CLR_ACCENT, CLR_ACCENT);
     draw_text_centered(hdc, g_tutorial_step < 4 ? "NEXT" : "START", &next_btn, g_font_button, CLR_BG_DARK);
     
     if (g_tutorial_step > 0) {
         RECT back_btn = {rc.right - 230, rc.bottom - 70, rc.right - 155, rc.bottom - 36};
-        draw_rounded_rect(hdc, &back_btn, 8, CLR_BG_INPUT, CLR_BORDER);
+        draw_rounded_rect_gdi(hdc, &back_btn, 8, CLR_BG_INPUT, CLR_BORDER);
         draw_text_centered(hdc, "BACK", &back_btn, g_font_normal, CLR_TEXT_DIM);
     }
 }
@@ -441,10 +524,8 @@ static LRESULT CALLBACK add_dlg_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) 
             CreateWindowA("BUTTON", "Cancel", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                 170, 230, 60, 30, hwnd, (HMENU)IDCANCEL, NULL, NULL);
             
-            EnumChildWindows(hwnd, (WNDENUMPROC)SendMessageA, (LPARAM)WM_SETFONT);
-            for (HWND child = GetWindow(hwnd, GW_CHILD); child; child = GetWindow(child, GW_HWNDNEXT)) {
+            for (HWND child = GetWindow(hwnd, GW_CHILD); child; child = GetWindow(child, GW_HWNDNEXT))
                 SendMessageA(child, WM_SETFONT, (WPARAM)font, TRUE);
-            }
             return 0;
         }
         
@@ -454,13 +535,11 @@ static LRESULT CALLBACK add_dlg_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) 
                 char file[512] = {0};
                 ofn.lStructSize = sizeof(ofn);
                 ofn.hwndOwner = hwnd;
-                ofn.lpstrFilter = "All Files\0*.*\0SSH Keys\0*.pem\0";
+                ofn.lpstrFilter = "All Files\0*.*\0";
                 ofn.lpstrFile = file;
                 ofn.nMaxFile = sizeof(file);
                 ofn.Flags = OFN_FILEMUSTEXIST;
-                if (GetOpenFileNameA(&ofn)) {
-                    SetWindowTextA(g_add_edit_key, file);
-                }
+                if (GetOpenFileNameA(&ofn)) SetWindowTextA(g_add_edit_key, file);
             } else if (LOWORD(wp) == IDOK) {
                 GetWindowTextA(g_add_edit_name, g_add_name, sizeof(g_add_name));
                 GetWindowTextA(g_add_edit_host, g_add_host, sizeof(g_add_host));
@@ -468,15 +547,13 @@ static LRESULT CALLBACK add_dlg_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) 
                 GetWindowTextA(g_add_edit_key, g_add_key, sizeof(g_add_key));
                 GetWindowTextA(g_add_edit_user, g_add_user, sizeof(g_add_user));
                 
-                if (strlen(g_add_name) == 0 || strlen(g_add_host) == 0) {
+                if (!g_add_name[0] || !g_add_host[0]) {
                     MessageBoxA(hwnd, "Please enter Name and Host.", "Missing Info", MB_OK);
                     return 0;
                 }
-                
                 if (g_ctx) {
                     int port = atoi(g_add_port);
-                    if (port <= 0) port = 443;
-                    hw_add_server(g_ctx, g_add_name, g_add_host, (uint16_t)port, g_add_key, g_add_user);
+                    hw_add_server(g_ctx, g_add_name, g_add_host, port > 0 ? port : 443, g_add_key, g_add_user);
                     g_selected_server = g_ctx->server_count - 1;
                     hw_save_config(g_ctx);
                 }
@@ -501,17 +578,13 @@ static void show_add_server_dialog(HWND parent) {
         NULL, LoadCursor(NULL, IDC_ARROW), (HBRUSH)(COLOR_BTNFACE + 1), NULL, "AddServerDlg", NULL};
     RegisterClassExA(&wc);
     
+    RECT prc; GetWindowRect(parent, &prc);
     int w = 320, h = 300;
-    RECT prc;
-    GetWindowRect(parent, &prc);
-    int x = prc.left + (prc.right - prc.left - w) / 2;
-    int y = prc.top + (prc.bottom - prc.top - h) / 2;
-    
     g_add_dlg = CreateWindowExA(WS_EX_DLGMODALFRAME, "AddServerDlg", "Add Server",
-        WS_POPUP | WS_CAPTION | WS_SYSMENU, x, y, w, h, parent, NULL, GetModuleHandle(NULL), NULL);
-    
+        WS_POPUP | WS_CAPTION | WS_SYSMENU, 
+        prc.left + (prc.right-prc.left-w)/2, prc.top + (prc.bottom-prc.top-h)/2,
+        w, h, parent, NULL, GetModuleHandle(NULL), NULL);
     ShowWindow(g_add_dlg, SW_SHOW);
-    UpdateWindow(g_add_dlg);
 }
 
 static int check_first_run(void) {
@@ -543,8 +616,7 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             g_brush_input = CreateSolidBrush(CLR_BG_INPUT);
             g_brush_accent = CreateSolidBrush(CLR_ACCENT);
             
-            RECT rc;
-            GetClientRect(hwnd, &rc);
+            RECT rc; GetClientRect(hwnd, &rc);
             init_layout(rc.right, rc.bottom);
             
             if (g_ctx) {
@@ -561,11 +633,10 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_PAINT: {
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hwnd, &ps);
-            RECT rc;
-            GetClientRect(hwnd, &rc);
+            RECT rc; GetClientRect(hwnd, &rc);
             HDC mem = CreateCompatibleDC(hdc);
             HBITMAP bmp = CreateCompatibleBitmap(hdc, rc.right, rc.bottom);
-            HBITMAP old = SelectObject(mem, bmp);
+            HBITMAP old = (HBITMAP)SelectObject(mem, bmp);
             
             if (g_show_tutorial) paint_tutorial(hwnd, mem);
             else paint_main(hwnd, mem);
@@ -588,14 +659,14 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             int h1 = g_hover_connect, h2 = g_hover_add, h3 = g_hover_dropdown;
             int h4 = g_hover_toggle_full, h5 = g_hover_toggle_kill;
             
-            g_hover_connect = PtInRect(&g_rect_btn_connect, (POINT){x, y});
-            g_hover_add = PtInRect(&g_rect_btn_add, (POINT){x, y});
-            g_hover_dropdown = PtInRect(&g_rect_server_box, (POINT){x, y});
-            g_hover_toggle_full = PtInRect(&g_rect_toggle_full, (POINT){x, y});
-            g_hover_toggle_kill = PtInRect(&g_rect_toggle_kill, (POINT){x, y});
+            POINT pt = MakePt(x, y);
+            g_hover_connect = PtInRect(&g_rect_btn_connect, pt);
+            g_hover_add = PtInRect(&g_rect_btn_add, pt);
+            g_hover_dropdown = PtInRect(&g_rect_server_box, pt);
+            g_hover_toggle_full = PtInRect(&g_rect_toggle_full, pt);
+            g_hover_toggle_kill = PtInRect(&g_rect_toggle_kill, pt);
             
-            if (h1 != g_hover_connect || h2 != g_hover_add || h3 != g_hover_dropdown ||
-                h4 != g_hover_toggle_full || h5 != g_hover_toggle_kill)
+            if (h1!=g_hover_connect || h2!=g_hover_add || h3!=g_hover_dropdown || h4!=g_hover_toggle_full || h5!=g_hover_toggle_kill)
                 InvalidateRect(hwnd, NULL, FALSE);
             
             TRACKMOUSEEVENT tme = {sizeof(tme), TME_LEAVE, hwnd, 0};
@@ -604,90 +675,72 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         }
         
         case WM_MOUSELEAVE:
-            g_hover_connect = g_hover_add = g_hover_dropdown = 0;
-            g_hover_toggle_full = g_hover_toggle_kill = 0;
+            g_hover_connect = g_hover_add = g_hover_dropdown = g_hover_toggle_full = g_hover_toggle_kill = 0;
             InvalidateRect(hwnd, NULL, FALSE);
             return 0;
         
         case WM_LBUTTONDOWN: {
             int x = GET_X_LPARAM(lp), y = GET_Y_LPARAM(lp);
-            RECT rc;
-            GetClientRect(hwnd, &rc);
+            RECT rc; GetClientRect(hwnd, &rc);
             
+            POINT pt = MakePt(x, y);
             if (g_show_tutorial) {
                 RECT next_btn = {rc.right - 140, rc.bottom - 70, rc.right - 32, rc.bottom - 36};
                 RECT back_btn = {rc.right - 230, rc.bottom - 70, rc.right - 155, rc.bottom - 36};
-                
-                if (PtInRect(&next_btn, (POINT){x, y})) {
-                    if (g_tutorial_step < 4) g_tutorial_step++;
-                    else g_show_tutorial = 0;
-                    InvalidateRect(hwnd, NULL, TRUE);
-                } else if (g_tutorial_step > 0 && PtInRect(&back_btn, (POINT){x, y})) {
+                if (PtInRect(&next_btn, pt)) {
+                    if (g_tutorial_step < 4) g_tutorial_step++; else g_show_tutorial = 0;
+                } else if (g_tutorial_step > 0 && PtInRect(&back_btn, pt)) {
                     g_tutorial_step--;
-                    InvalidateRect(hwnd, NULL, TRUE);
                 }
+                InvalidateRect(hwnd, NULL, TRUE);
                 return 0;
             }
             
-            if (PtInRect(&g_rect_btn_connect, (POINT){x, y})) {
-                if (g_ctx) {
-                    if (g_ctx->status == HW_CONNECTED) {
-                        hw_disconnect(g_ctx);
-                    } else if (g_ctx->status == HW_DISCONNECTED) {
-                        if (g_ctx->server_count == 0) {
-                            MessageBoxA(hwnd, "Please add a server first.", "No Server", MB_OK);
-                        } else {
-                            g_ctx->current_server = g_selected_server;
-                            g_ctx->mode = g_full_tunnel ? HW_MODE_FULL_TUNNEL : HW_MODE_PROXY;
-                            g_ctx->kill_switch = g_kill_switch;
-                            hw_connect(g_ctx);
-                        }
+            if (PtInRect(&g_rect_btn_connect, pt) && g_ctx) {
+                if (g_ctx->status == HW_CONNECTED) hw_disconnect(g_ctx);
+                else if (g_ctx->status == HW_DISCONNECTED) {
+                    if (g_ctx->server_count == 0) MessageBoxA(hwnd, "Please add a server first.", "No Server", MB_OK);
+                    else {
+                        g_ctx->current_server = g_selected_server;
+                        g_ctx->mode = g_full_tunnel ? HW_MODE_FULL_TUNNEL : HW_MODE_PROXY;
+                        g_ctx->kill_switch = g_kill_switch;
+                        hw_connect(g_ctx);
                     }
                 }
-                InvalidateRect(hwnd, NULL, TRUE);
-            } else if (PtInRect(&g_rect_btn_add, (POINT){x, y})) {
+            } else if (PtInRect(&g_rect_btn_add, pt)) {
                 show_add_server_dialog(hwnd);
-            } else if (PtInRect(&g_rect_server_box, (POINT){x, y})) {
+            } else if (PtInRect(&g_rect_server_box, pt)) {
                 g_dropdown_open = !g_dropdown_open;
-                InvalidateRect(hwnd, NULL, FALSE);
-            } else if (g_dropdown_open && PtInRect(&g_rect_server_dropdown, (POINT){x, y})) {
+            } else if (g_dropdown_open && PtInRect(&g_rect_server_dropdown, pt)) {
                 int idx = (y - g_rect_server_dropdown.top - 10) / 36;
                 if (idx >= 0 && g_ctx && idx < g_ctx->server_count) g_selected_server = idx;
                 g_dropdown_open = 0;
-                InvalidateRect(hwnd, NULL, FALSE);
-            } else if (PtInRect(&g_rect_toggle_full, (POINT){x, y})) {
+            } else if (PtInRect(&g_rect_toggle_full, pt)) {
                 g_full_tunnel = !g_full_tunnel;
-                InvalidateRect(hwnd, NULL, FALSE);
-            } else if (PtInRect(&g_rect_toggle_kill, (POINT){x, y})) {
+            } else if (PtInRect(&g_rect_toggle_kill, pt)) {
                 g_kill_switch = !g_kill_switch;
-                InvalidateRect(hwnd, NULL, FALSE);
-            } else if (g_dropdown_open) {
+            } else {
                 g_dropdown_open = 0;
-                InvalidateRect(hwnd, NULL, FALSE);
             }
+            InvalidateRect(hwnd, NULL, FALSE);
             return 0;
         }
         
-        case WM_ERASEBKGND:
-            return 1;
+        case WM_ERASEBKGND: return 1;
         
         case WM_DESTROY:
             KillTimer(hwnd, ID_TIMER_UPDATE);
-            DeleteObject(g_font_title);
-            DeleteObject(g_font_normal);
-            DeleteObject(g_font_button);
-            DeleteObject(g_font_small);
-            DeleteObject(g_brush_bg);
-            DeleteObject(g_brush_card);
-            DeleteObject(g_brush_input);
-            DeleteObject(g_brush_accent);
+            DeleteObject(g_font_title); DeleteObject(g_font_normal);
+            DeleteObject(g_font_button); DeleteObject(g_font_small);
+            DeleteObject(g_brush_bg); DeleteObject(g_brush_card);
+            DeleteObject(g_brush_input); DeleteObject(g_brush_accent);
+            if (g_icon) DestroyIcon(g_icon);
             PostQuitMessage(0);
             return 0;
         
         case WM_CLOSE:
             if (g_ctx && g_ctx->status == HW_CONNECTED) {
-                if (MessageBoxA(hwnd, "Still connected. Disconnect and exit?", "HelloWorld", MB_YESNO) != IDYES)
-                    return 0;
+                if (MessageBoxA(hwnd, "Still connected. Disconnect?", "HelloWorld", MB_YESNO) != IDYES) return 0;
                 hw_disconnect(g_ctx);
             }
             DestroyWindow(hwnd);
@@ -698,20 +751,28 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 
 int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show) {
     (void)prev; (void)cmd;
+    
+    GdiplusStartupInput gdiplusStartupInput;
+    GdiplusStartup(&g_gdiplusToken, &gdiplusStartupInput, NULL);
+    
     SetProcessDPIAware();
     g_ctx = hw_create();
     
+    g_icon = create_eye_icon(32);
+    HICON iconSmall = create_eye_icon(16);
+    
     WNDCLASSEXA wc = {sizeof(wc), CS_HREDRAW | CS_VREDRAW, window_proc, 0, 0, inst,
-        NULL, LoadCursor(NULL, IDC_ARROW), NULL, NULL, "HelloWorldClass", NULL};
+        g_icon, LoadCursor(NULL, IDC_ARROW), NULL, NULL, "HelloWorldClass", iconSmall};
     RegisterClassExA(&wc);
     
     int w = 360, h = 580;
-    int x = (GetSystemMetrics(SM_CXSCREEN) - w) / 2;
-    int y = (GetSystemMetrics(SM_CYSCREEN) - h) / 2;
-    
     g_hwnd = CreateWindowExA(WS_EX_APPWINDOW, "HelloWorldClass", "HelloWorld",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
-        x, y, w, h, NULL, NULL, inst, NULL);
+        (GetSystemMetrics(SM_CXSCREEN)-w)/2, (GetSystemMetrics(SM_CYSCREEN)-h)/2,
+        w, h, NULL, NULL, inst, NULL);
+    
+    SendMessage(g_hwnd, WM_SETICON, ICON_BIG, (LPARAM)g_icon);
+    SendMessage(g_hwnd, WM_SETICON, ICON_SMALL, (LPARAM)iconSmall);
     
     ShowWindow(g_hwnd, show);
     UpdateWindow(g_hwnd);
@@ -723,6 +784,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show) {
     }
     
     hw_destroy(g_ctx);
+    GdiplusShutdown(g_gdiplusToken);
     return (int)msg.wParam;
 }
 

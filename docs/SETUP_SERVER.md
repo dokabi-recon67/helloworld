@@ -28,11 +28,18 @@ Before creating your VM, you need a network.
 5. Select **Create VCN with Internet Connectivity**
 6. Click **Start VCN Wizard**
 7. Configure:
-   - **VCN Name:** `helloworld-vcn`
-   - **Compartment:** Your root compartment
-   - Leave other settings as default
+
+| Setting | Value |
+|---------|-------|
+| **VCN Name** | `helloworld-vcn` |
+| **Compartment** | Your root compartment |
+| **IPv4 CIDR Block** | `10.0.0.0/16` (default, leave as is) |
+| **Use DNS hostnames in this VCN** | **Checked** (recommended) |
+
 8. Click **Next**, then **Create**
 9. Wait for it to complete
+
+**Note on CIDR:** The default `10.0.0.0/16` gives you 65,536 private IP addresses - way more than you'll ever need for a personal tunnel. Don't change it unless you have a specific reason.
 
 ---
 

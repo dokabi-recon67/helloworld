@@ -147,21 +147,23 @@ static HICON create_eye_icon(int size) {
     int ew = size * 4 / 5;
     int eh = size * 2 / 5;
     
-    SolidBrush accentBrush(Color(255, 0, 255, 136));
-    SolidBrush whiteBrush(Color(255, 255, 255, 255));
-    SolidBrush blackBrush(Color(255, 13, 17, 23));
-    Pen outlinePen(Color(255, 0, 200, 100), 2.0f);
+    SolidBrush eyeBrush(Color(255, 20, 20, 25));
+    SolidBrush whiteBrush(Color(255, 240, 240, 245));
+    SolidBrush pupilBrush(Color(255, 5, 5, 8));
+    Pen outlinePen(Color(255, 60, 60, 70), 1.5f);
     
-    g.FillEllipse(&accentBrush, cx - ew/2, cy - eh/2, ew, eh);
+    g.FillEllipse(&eyeBrush, cx - ew/2, cy - eh/2, ew, eh);
+    g.DrawEllipse(&outlinePen, cx - ew/2, cy - eh/2, ew, eh);
     
     int irisSize = size / 3;
     g.FillEllipse(&whiteBrush, cx - irisSize/2, cy - irisSize/2, irisSize, irisSize);
     
-    int pupilSize = size / 6;
-    g.FillEllipse(&blackBrush, cx - pupilSize/2, cy - pupilSize/2, pupilSize, pupilSize);
+    int pupilSize = size / 5;
+    g.FillEllipse(&pupilBrush, cx - pupilSize/2, cy - pupilSize/2, pupilSize, pupilSize);
     
-    int glintSize = size / 12;
-    g.FillEllipse(&whiteBrush, cx - pupilSize/4, cy - pupilSize/4, glintSize, glintSize);
+    int glintSize = size / 10;
+    SolidBrush glintBrush(Color(200, 255, 255, 255));
+    g.FillEllipse(&glintBrush, cx - pupilSize/3, cy - pupilSize/3, glintSize, glintSize);
     
     ICONINFO ii = {0};
     ii.fIcon = TRUE;

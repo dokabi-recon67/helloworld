@@ -36,10 +36,23 @@ Before creating your VM, you need a network.
 | **IPv4 CIDR Block** | `10.0.0.0/16` (default, leave as is) |
 | **Use DNS hostnames in this VCN** | **Checked** (recommended) |
 
-8. Click **Next**, then **Create**
-9. Wait for it to complete
+### Adding IPv6 Support (Optional but Recommended)
 
-**Note on CIDR:** The default `10.0.0.0/16` gives you 65,536 private IP addresses - way more than you'll ever need for a personal tunnel. Don't change it unless you have a specific reason.
+8. Scroll down to **Add IPv6 Prefixes**
+9. Click **Add IPv6 Prefix**
+10. Configure:
+
+| Setting | Value |
+|---------|-------|
+| **Prefix type** | **Oracle allocated IPv6 /56 prefix** |
+| **IPv6 prefix** | Leave blank (auto-assigned) |
+
+This gives you a `/56` block with ~4 sextillion IPv6 addresses (more than enough!).
+
+11. Click **Next**, then **Create**
+12. Wait for it to complete
+
+**Note on CIDR:** The default `10.0.0.0/16` gives you 65,536 private IPv4 addresses. The `/56` IPv6 prefix is also free and future-proofs your setup.
 
 ---
 
@@ -50,20 +63,58 @@ This allows your tunnel traffic through.
 1. In your new VCN, click **Public Subnet-helloworld-vcn**
 2. Click the **Default Security List**
 3. Click **Add Ingress Rules**
-4. Add this rule:
+
+### Rule 1: IPv4 TCP 443
+
+| Setting | Value |
+|---------|-------|
+| Stateless | No (unchecked) |
+| Source Type | CIDR |
+| Source CIDR | `0.0.0.0/0` |
+| IP Protocol | TCP |
+| Destination Port Range | `443` |
+| Description | HelloWorld Tunnel IPv4 |
+
+Click **+ Another Ingress Rule** to add more rules:
+
+### Rule 2: IPv6 TCP 443
+
+| Setting | Value |
+|---------|-------|
+| Stateless | No (unchecked) |
+| Source Type | CIDR |
+| Source CIDR | `::/0` |
+| IP Protocol | TCP |
+| Destination Port Range | `443` |
+| Description | HelloWorld Tunnel IPv6 |
+
+### Rule 3: IPv4 UDP 443 (Optional)
 
 | Setting | Value |
 |---------|-------|
 | Source Type | CIDR |
 | Source CIDR | `0.0.0.0/0` |
-| IP Protocol | TCP |
+| IP Protocol | UDP |
 | Destination Port Range | `443` |
-| Description | HelloWorld Tunnel |
+| Description | HelloWorld UDP IPv4 |
 
-5. Click **Add Ingress Rules**
+### Rule 4: IPv6 UDP 443 (Optional)
 
-**Also add UDP 443 (optional but recommended):**
-- Repeat above with IP Protocol: **UDP**
+| Setting | Value |
+|---------|-------|
+| Source Type | CIDR |
+| Source CIDR | `::/0` |
+| IP Protocol | UDP |
+| Destination Port Range | `443` |
+| Description | HelloWorld UDP IPv6 |
+
+4. Click **Add Ingress Rules**
+
+**Summary of rules to add:**
+- `0.0.0.0/0` TCP 443 (IPv4)
+- `::/0` TCP 443 (IPv6)
+- `0.0.0.0/0` UDP 443 (IPv4, optional)
+- `::/0` UDP 443 (IPv6, optional)
 
 ---
 
@@ -106,6 +157,7 @@ Click **Select Shape**
 | Virtual Cloud Network | `helloworld-vcn` (the one you created) |
 | Subnet | Public Subnet |
 | Public IPv4 Address | **Assign a public IPv4 address** (IMPORTANT!) |
+| Public IPv6 Address | **Assign a public IPv6 address** (if you added IPv6 to VCN) |
 
 ### SSH Keys (IMPORTANT!)
 

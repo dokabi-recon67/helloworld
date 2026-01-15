@@ -91,8 +91,9 @@
                     <p>In Oracle Cloud Console: <strong>Networking</strong> > <strong>Virtual Cloud Networks</strong> > <strong>Start VCN Wizard</strong> > Select "Create VCN with Internet Connectivity".</p>
                     <ul class="simple-list">
                         <li>VCN Name: <code>helloworld-vcn</code></li>
-                        <li>IPv4 CIDR Block: <code>10.0.0.0/16</code> (default, keep it)</li>
+                        <li>IPv4 CIDR Block: <code>10.0.0.0/16</code> (default)</li>
                         <li>Use DNS hostnames: <strong>Checked</strong></li>
+                        <li>Add IPv6 Prefix: Click <strong>Add IPv6 Prefix</strong> > Select <strong>Oracle allocated /56</strong></li>
                     </ul>
                 </div>
 
@@ -101,10 +102,11 @@
                     <h3>Open Port 443</h3>
                     <p>In your VCN, click <strong>Public Subnet</strong> > <strong>Default Security List</strong> > <strong>Add Ingress Rules</strong>:</p>
                     <ul class="simple-list">
-                        <li>Source CIDR: <code>0.0.0.0/0</code></li>
-                        <li>Protocol: TCP</li>
-                        <li>Port: <code>443</code></li>
+                        <li>Source CIDR: <code>0.0.0.0/0</code> (IPv4)</li>
+                        <li>Source CIDR: <code>::/0</code> (IPv6)</li>
+                        <li>Protocol: TCP, Port: <code>443</code></li>
                     </ul>
+                    <p class="step-note">Add both rules - one for IPv4, one for IPv6!</p>
                 </div>
 
                 <div class="step-card">

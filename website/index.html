@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HelloWorld - Stealth Tunnel</title>
+    <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>HelloWorld</h1>
+            <p class="tagline">DPI-Resistant Encrypted Tunnel</p>
+        </header>
+
+        <section class="hero">
+            <div class="hero-content">
+                <h2>Your Traffic. Your Server. Your Rules.</h2>
+                <p>Open-source stealth tunnel that looks like regular HTTPS traffic. Self-hosted on your own cloud VM. No third parties.</p>
+                <div class="cta-buttons">
+                    <a href="#download" class="btn btn-primary">Download</a>
+                    <a href="https://github.com/yourusername/helloworld" class="btn btn-secondary">View Source</a>
+                </div>
+            </div>
+        </section>
+
+        <section class="features" id="features">
+            <h2>How It Works</h2>
+            <div class="feature-grid">
+                <div class="feature">
+                    <div class="feature-icon">1</div>
+                    <h3>TLS Wrapper</h3>
+                    <p>All traffic wrapped in TLS on port 443. Indistinguishable from normal HTTPS.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">2</div>
+                    <h3>SSH Transport</h3>
+                    <p>Battle-tested SSH encryption inside. No custom crypto. No vulnerabilities.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">3</div>
+                    <h3>Full Tunnel</h3>
+                    <p>Route all system traffic through your server. Your IP becomes the VM's IP.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">4</div>
+                    <h3>Tor Mode</h3>
+                    <p>Optional Tor exit with circuit rotation. Change your IP on demand.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="download" id="download">
+            <h2>Download</h2>
+            <div class="download-grid">
+                <div class="download-card">
+                    <h3>Windows</h3>
+                    <p>Windows 10/11 64-bit</p>
+                    <a href="releases/helloworld-win64.zip" class="btn btn-download">Download .zip</a>
+                </div>
+                <div class="download-card">
+                    <h3>macOS</h3>
+                    <p>macOS 11+ (Intel & Apple Silicon)</p>
+                    <a href="releases/helloworld-macos.zip" class="btn btn-download">Download .zip</a>
+                </div>
+                <div class="download-card">
+                    <h3>Server</h3>
+                    <p>Linux VM (Ubuntu/Debian/RHEL)</p>
+                    <a href="releases/helloworld-server.tar.gz" class="btn btn-download">Download .tar.gz</a>
+                </div>
+            </div>
+        </section>
+
+        <section class="quickstart" id="quickstart">
+            <h2>Quick Start</h2>
+            <div class="steps">
+                <div class="step">
+                    <h3>1. Set Up Your VM</h3>
+                    <pre><code>wget https://helloworld.example/install.sh
+chmod +x install.sh
+sudo ./install.sh
+sudo helloworld-server setup
+sudo helloworld-server start</code></pre>
+                </div>
+                <div class="step">
+                    <h3>2. Add Your SSH Key</h3>
+                    <pre><code># On your VM
+echo "your-ssh-public-key" >> ~/.ssh/authorized_keys</code></pre>
+                </div>
+                <div class="step">
+                    <h3>3. Configure Client</h3>
+                    <p>Open HelloWorld, add your server (hostname, key path), and click Connect.</p>
+                </div>
+                <div class="step">
+                    <h3>4. Verify</h3>
+                    <p>Visit <a href="https://api.ipify.org" target="_blank">api.ipify.org</a> - you should see your VM's IP.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="requirements" id="requirements">
+            <h2>Requirements</h2>
+            <div class="req-grid">
+                <div class="req-card">
+                    <h3>Client</h3>
+                    <ul>
+                        <li>Windows 10+ or macOS 11+</li>
+                        <li>OpenSSH (included in OS)</li>
+                        <li>stunnel (bundled)</li>
+                    </ul>
+                </div>
+                <div class="req-card">
+                    <h3>Server</h3>
+                    <ul>
+                        <li>Linux VM (any cloud provider)</li>
+                        <li>Port 443 open</li>
+                        <li>Root access</li>
+                    </ul>
+                </div>
+                <div class="req-card">
+                    <h3>Recommended</h3>
+                    <ul>
+                        <li>Oracle Cloud Free Tier</li>
+                        <li>Google Cloud Free Tier</li>
+                        <li>Any VPS with 443/tcp</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <p>HelloWorld is open source under MIT License</p>
+            <p>Written in C. No dependencies. No tracking. No compromise.</p>
+            <div class="footer-links">
+                <a href="https://github.com/yourusername/helloworld">GitHub</a>
+                <a href="docs/index.html">Documentation</a>
+                <a href="#download">Download</a>
+            </div>
+        </footer>
+    </div>
+
+    <script src="static/js/main.js"></script>
+</body>
+</html>
+

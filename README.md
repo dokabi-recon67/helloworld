@@ -41,7 +41,7 @@ HelloWorld creates a stealth tunnel between your computer and a cloud VM you con
 
 ```bash
 # Download and extract
-wget https://github.com/yourusername/helloworld/releases/latest/download/helloworld-server.tar.gz
+wget https://github.com/dokabi-recon67/helloworld/releases/latest/download/helloworld-server.tar.gz
 tar xzf helloworld-server.tar.gz
 cd helloworld-server
 

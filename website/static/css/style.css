@@ -196,6 +196,28 @@ section h2 {
     font-size: 0.9rem;
 }
 
+/* Guide Banner */
+.guide-banner {
+    max-width: 800px;
+    margin: 0 auto 40px;
+    background: linear-gradient(135deg, rgba(0, 255, 136, 0.1), rgba(0, 204, 255, 0.1));
+    border: 1px solid var(--accent);
+    border-radius: 12px;
+    padding: 20px 28px;
+    text-align: center;
+}
+
+.guide-banner p {
+    color: var(--text-primary);
+    font-size: 1rem;
+    margin: 0;
+}
+
+.guide-banner a {
+    color: var(--accent);
+    font-weight: 600;
+}
+
 /* New Simple Steps Styling */
 .steps-simple {
     display: flex;
@@ -272,6 +294,13 @@ section h2 {
     position: absolute;
     left: 0;
     color: var(--accent);
+}
+
+.simple-list code {
+    background: var(--bg-primary);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.9em;
 }
 
 .step-card pre {

@@ -74,61 +74,66 @@
         <section class="quickstart" id="quickstart">
             <h2>Quick Start Guide</h2>
             
+            <div class="guide-banner">
+                <p>Need detailed step-by-step with screenshots? See the <a href="https://github.com/dokabi-recon67/helloworld/blob/main/docs/SETUP_SERVER.md" target="_blank">Complete Oracle Cloud Setup Guide</a></p>
+            </div>
+            
             <div class="steps-simple">
                 <div class="step-card">
                     <div class="step-number">1</div>
-                    <h3>Create a Free Cloud VM</h3>
-                    <p>Sign up for <a href="https://cloud.oracle.com" target="_blank">Oracle Cloud Free Tier</a> and create a small Linux VM (Ubuntu recommended).</p>
-                    <p class="step-note">Make sure to save the SSH key file they give you!</p>
+                    <h3>Create Oracle Cloud Account</h3>
+                    <p>Go to <a href="https://cloud.oracle.com" target="_blank">cloud.oracle.com</a> and sign up for free. Add a card for verification (you will NOT be charged for Always Free resources).</p>
                 </div>
 
                 <div class="step-card">
                     <div class="step-number">2</div>
-                    <h3>Open Port 443 on Your VM</h3>
-                    <p>In your cloud dashboard, find "Security Rules" or "Firewall" and add a rule to allow incoming traffic on <strong>port 443 (TCP)</strong>.</p>
+                    <h3>Create a Network (VCN)</h3>
+                    <p>In Oracle Cloud Console: <strong>Networking</strong> > <strong>Virtual Cloud Networks</strong> > <strong>Start VCN Wizard</strong> > Select "Create VCN with Internet Connectivity".</p>
                 </div>
 
                 <div class="step-card">
                     <div class="step-number">3</div>
-                    <h3>Set Up the Server</h3>
-                    <p>Connect to your VM and run the automatic installer:</p>
+                    <h3>Open Port 443</h3>
+                    <p>In your VCN, click <strong>Public Subnet</strong> > <strong>Default Security List</strong> > <strong>Add Ingress Rules</strong>:</p>
                     <ul class="simple-list">
-                        <li>Open your VM's terminal (via SSH or web console)</li>
-                        <li>Copy and paste this one command:</li>
+                        <li>Source CIDR: <code>0.0.0.0/0</code></li>
+                        <li>Protocol: TCP</li>
+                        <li>Port: <code>443</code></li>
                     </ul>
-                    <pre><code>curl -sSL https://raw.githubusercontent.com/dokabi-recon67/helloworld/main/scripts/install_server.sh | sudo bash</code></pre>
-                    <p class="step-note">This installs everything automatically!</p>
                 </div>
 
                 <div class="step-card">
                     <div class="step-number">4</div>
-                    <h3>Download the Client App</h3>
-                    <p>Download HelloWorld for your computer:</p>
+                    <h3>Create Your VM</h3>
+                    <p><strong>Compute</strong> > <strong>Instances</strong> > <strong>Create Instance</strong></p>
                     <ul class="simple-list">
-                        <li><a href="https://github.com/dokabi-recon67/helloworld/releases">Windows: HelloWorld-win64.zip</a></li>
-                        <li><a href="https://github.com/dokabi-recon67/helloworld/releases">macOS: HelloWorld-macos.zip</a></li>
+                        <li>Image: <strong>Oracle Linux 9</strong> or Ubuntu</li>
+                        <li>Shape: <strong>VM.Standard.A1.Flex</strong> (Always Free!)</li>
+                        <li>OCPUs: 2-4, Memory: 12-24 GB (all free)</li>
+                        <li>Network: Your VCN, Public Subnet</li>
+                        <li>Public IP: <strong>Assign public IPv4</strong></li>
+                        <li>SSH Key: <strong>Generate key pair</strong> and SAVE both files!</li>
                     </ul>
-                    <p>Extract the ZIP and run <strong>helloworld.exe</strong> (Windows) or <strong>HelloWorld.app</strong> (Mac).</p>
                 </div>
 
                 <div class="step-card">
                     <div class="step-number">5</div>
-                    <h3>Add Your Server</h3>
-                    <p>In the HelloWorld app, click <strong>Settings</strong> and edit the config file:</p>
-                    <ul class="simple-list">
-                        <li><strong>name</strong> = Any name (e.g., "My VPS")</li>
-                        <li><strong>host</strong> = Your VM's IP address</li>
-                        <li><strong>port</strong> = 443</li>
-                        <li><strong>key</strong> = Path to your SSH key file</li>
-                        <li><strong>user</strong> = root (or ubuntu)</li>
-                    </ul>
+                    <h3>Install HelloWorld Server</h3>
+                    <p>Connect to your VM via SSH and run:</p>
+                    <pre><code>curl -sSL https://raw.githubusercontent.com/dokabi-recon67/helloworld/main/scripts/install_server.sh | sudo bash</code></pre>
+                    <p class="step-note">Username is <code>opc</code> for Oracle Linux, <code>ubuntu</code> for Ubuntu</p>
                 </div>
 
                 <div class="step-card">
                     <div class="step-number">6</div>
-                    <h3>Connect!</h3>
-                    <p>Select your server from the dropdown and click <strong>CONNECT</strong>.</p>
-                    <p>To verify it's working, visit <a href="https://api.ipify.org" target="_blank">api.ipify.org</a> - you should see your VM's IP address!</p>
+                    <h3>Download Client and Connect</h3>
+                    <ul class="simple-list">
+                        <li>Download <a href="https://github.com/dokabi-recon67/helloworld/releases">HelloWorld for Windows/Mac</a></li>
+                        <li>Run the app, click <strong>+ ADD SERVER</strong></li>
+                        <li>Enter your VM's IP, port 443, browse to your SSH key</li>
+                        <li>Click <strong>CONNECT</strong></li>
+                    </ul>
+                    <p>Verify at <a href="https://api.ipify.org" target="_blank">api.ipify.org</a> - shows your VM's IP!</p>
                 </div>
             </div>
 

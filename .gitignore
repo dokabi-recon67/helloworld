@@ -1,52 +1,96 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
+# Build artifacts
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-venv/
-ENV/
-.venv/
+*.exe
+*.app
+*.dmg
+*.msi
+*.o
+*.obj
+*.lib
+*.dll
+*.so
+*.dylib
 
-# IDE
+# IDE and editor
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
 .cursor/
+*.user
+*.suo
 
-# OS
+# OS files
 .DS_Store
 Thumbs.db
 Desktop.ini
+ehthumbs.db
 
-# Project specific
+# ============================================
+# SECURITY - NEVER COMMIT THESE
+# ============================================
+
+# SSH Keys - NEVER commit private keys!
 *.pem
 *.key
-id_*
+*.ppk
+id_rsa
+id_ed25519
+id_ecdsa
+id_dsa
+*.pub
 known_hosts
+authorized_keys
+
+# TLS/SSL certificates
+*.crt
+*.cer
+*.p12
+*.pfx
+
+# Config files with credentials
 config.json
 profiles.json
-*.log
+servers.json
+settings.json
+helloworld.conf
+*.conf
 
-# Secrets - NEVER commit these
-secrets/
+# Environment and secrets
 .env
-.env.local
+.env.*
+secrets/
+credentials/
+private/
 
+# User data directories
+%APPDATA%/HelloWorld/
+~/.helloworld/
+~/.config/helloworld/
+
+# Logs (may contain IPs)
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Python (legacy)
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# Node (if any)
+node_modules/
+
+# ============================================
+# EXAMPLES ARE OK TO COMMIT
+# ============================================
+!config.example.json
+!servers.example.json

@@ -15,72 +15,63 @@ HelloWorld creates a stealth tunnel between your computer and a cloud VM you con
 - Full tunnel mode (all traffic through VM)
 - Proxy mode (SOCKS5 for specific apps)
 - Tor exit mode with circuit rotation
+- Kill switch (blocks traffic if tunnel drops)
 - Cross-platform (Windows, macOS)
 - Written in C (fast, no dependencies)
+- Modern GUI with tutorial for beginners
+
+## Quick Start
+
+See the **[Complete Setup Guide](docs/SETUP_SERVER.md)** for detailed step-by-step instructions with Oracle Cloud Free Tier.
+
+### TL;DR
+
+1. Get a free cloud VM (Oracle Cloud recommended)
+2. Run this on your VM:
+   ```bash
+   curl -sSL https://raw.githubusercontent.com/dokabi-recon67/helloworld/main/scripts/install_server.sh | sudo bash
+   ```
+3. Download the client app from [Releases](https://github.com/dokabi-recon67/helloworld/releases)
+4. Add your server, click Connect
+5. Verify at https://api.ipify.org
+
+---
+
+## Security Notice
+
+### What's Safe to Share
+- This repository (no credentials stored)
+- The HelloWorld app itself
+- Your server's public IP (if you want others to connect)
+
+### NEVER Share or Commit
+- SSH private keys (`.key`, `.pem`, `id_rsa`, etc.)
+- Your `config.json` or `config.txt` files
+- Server TLS certificates with private keys
+- Anything in your `%APPDATA%\HelloWorld\` or `~/.helloworld/` folder
+
+The `.gitignore` in this repo blocks sensitive files, but **always double-check before pushing any forks**.
+
+---
 
 ## Requirements
 
 ### Client
 - Windows 10+ or macOS 11+
-- stunnel (bundled)
+- stunnel (bundled with app)
 - OpenSSH (included in OS)
 
 ### Server
 - Linux VM with root access
-- Port 443 open
+- Port 443 open (TCP, optionally UDP)
 - 512MB RAM minimum
 
-### Recommended Cloud Providers
-- Oracle Cloud Free Tier (best)
-- Google Cloud Free Tier
-- Any VPS provider
+### Recommended Cloud Providers (Free Tier)
+- **Oracle Cloud** - 4 ARM CPUs, 24GB RAM free forever
+- Google Cloud - Small VM free for 90 days
+- Any VPS provider with port 443 access
 
-## Quick Start
-
-### Server Setup
-
-```bash
-# Download and extract
-wget https://github.com/dokabi-recon67/helloworld/releases/latest/download/helloworld-server.tar.gz
-tar xzf helloworld-server.tar.gz
-cd helloworld-server
-
-# Build
-mkdir build && cd build
-cmake ..
-make
-sudo make install
-
-# Setup and start
-sudo helloworld-server setup
-sudo helloworld-server start
-```
-
-### Add Your SSH Key
-
-```bash
-# On your local machine, generate a key if needed
-ssh-keygen -t ed25519 -f ~/.ssh/helloworld
-
-# Copy public key to server
-cat ~/.ssh/helloworld.pub | ssh root@your-vm "cat >> ~/.ssh/authorized_keys"
-```
-
-### Client Setup
-
-1. Download the client for your OS from Releases
-2. Extract and run HelloWorld
-3. Add your server:
-   - Name: Any name you want
-   - Host: Your VM's IP or hostname
-   - Port: 443
-   - Key: Path to your SSH private key
-   - User: root (or your VM username)
-4. Click Connect
-
-### Verify
-
-Visit https://api.ipify.org - you should see your VM's IP address.
+---
 
 ## Building From Source
 
@@ -88,8 +79,7 @@ Visit https://api.ipify.org - you should see your VM's IP address.
 
 ```powershell
 cd client
-mkdir build
-cd build
+mkdir build && cd build
 cmake .. -G "Visual Studio 17 2022"
 cmake --build . --config Release
 ```
@@ -113,30 +103,26 @@ make
 sudo make install
 ```
 
+---
+
 ## Server Commands
 
 ```bash
-# Start server
+# Start/stop server
 sudo helloworld-server start
-
-# Stop server
 sudo helloworld-server stop
-
-# Check status
 sudo helloworld-server status
 
-# Switch to Tor exit mode
+# Tor mode (anonymous exit)
 sudo helloworld-server tor
-
-# Rotate Tor circuit (get new IP)
-sudo helloworld-server rotate
-
-# Switch back to direct mode
-sudo helloworld-server direct
+sudo helloworld-server rotate   # Get new Tor IP
+sudo helloworld-server direct   # Back to normal
 
 # Show current public IP
 sudo helloworld-server ip
 ```
+
+---
 
 ## Configuration
 
@@ -146,7 +132,7 @@ Location:
 - Windows: `%APPDATA%\HelloWorld\config.txt`
 - macOS: `~/.helloworld/config.txt`
 
-Format:
+Example (see `config.example.json`):
 ```ini
 mode = proxy
 killswitch = 0
@@ -154,20 +140,22 @@ selected = 0
 
 [server]
 name = My Server
-host = 192.168.1.100
+host = YOUR_SERVER_IP
 port = 443
-key = C:\Users\me\.ssh\helloworld
-user = root
+key = /path/to/your/private-key
+user = opc
 ```
 
 ### Server Config
 
 Location: `/etc/helloworld/`
 
-Files:
+Files generated during setup (do not share):
 - `stunnel.conf` - TLS wrapper config
-- `server.pem` - TLS certificate
-- `server.key` - TLS private key
+- `server.pem` - TLS certificate (auto-generated)
+- `server.key` - TLS private key (auto-generated)
+
+---
 
 ## How It Works
 
@@ -186,36 +174,54 @@ Your Computer                    Your VM                     Internet
 4. All traffic routed through SOCKS proxy
 5. VM forwards traffic to internet (direct, through Tor, or through VPN)
 
-## Security
+---
 
-- No custom cryptography
-- TLS 1.3 via stunnel
-- SSH with key authentication only
-- No passwords
-- All code is open source and auditable
+## Security Model
+
+- **No custom cryptography** - Uses proven TLS 1.3 + SSH
+- **Key-only authentication** - No passwords
+- **Self-hosted** - You control the server
+- **Open source** - Fully auditable code
+- **No telemetry** - Zero data collection
+
+---
 
 ## Troubleshooting
 
 ### Connection fails
-- Check VM firewall allows port 443
-- Verify SSH key permissions (600)
-- Check stunnel is running on server
+- Check VM firewall/security list allows port 443
+- Verify SSH key permissions (`chmod 600` on Linux/Mac)
+- Check stunnel is running: `sudo systemctl status stunnel4`
 
 ### IP not changing
-- Enable "Full Tunnel Mode" in client
-- Verify system proxy settings applied
-- Try disconnecting and reconnecting
+- Enable **Full Tunnel Mode** in the app
+- Check system proxy settings were applied
+- Try disconnect and reconnect
 
 ### Tor not working
-- Ensure Tor is installed on server
-- Check Tor control port (9051) is accessible locally
+- Ensure Tor is installed: `sudo apt install tor`
 - Wait 30 seconds after enabling Tor mode
+- Check Tor is running: `sudo systemctl status tor`
+
+---
+
+## Contributing
+
+1. Fork the repo
+2. Make your changes
+3. **Ensure no credentials or private IPs in your commits**
+4. Submit a pull request
+
+---
 
 ## License
 
-MIT License. See LICENSE file.
+MIT License. See [LICENSE](LICENSE) file.
+
+---
 
 ## Disclaimer
 
-This software is for personal use only. Users are responsible for compliance with local laws. This is not anonymity software and should not be used for illegal activities.
+This software is provided for personal privacy and security purposes. Users are responsible for compliance with all applicable laws. The developers assume no liability for misuse.
 
+This is **not** anonymity software and does not guarantee privacy against state-level adversaries. For strong anonymity, use Tor Browser directly.

@@ -398,6 +398,37 @@ section h2 {
     border-bottom: none;
 }
 
+/* Privacy/Security Section */
+.security-notice {
+    background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+}
+
+.privacy-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+}
+
+.privacy-card {
+    background: var(--bg-card);
+    padding: 32px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    text-align: center;
+}
+
+.privacy-card h3 {
+    color: var(--accent);
+    margin-bottom: 12px;
+    font-size: 1.2rem;
+}
+
+.privacy-card p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+
 footer {
     padding: 60px 0;
     text-align: center;

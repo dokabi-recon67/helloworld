@@ -118,15 +118,17 @@
                         <li>Shape: <strong>VM.Standard.A1.Flex</strong> (Always Free!)</li>
                         <li>OCPUs: 2-4, Memory: 12-24 GB (all free)</li>
                         <li>Network: Your VCN, Public Subnet</li>
-                        <li>Public IP: <strong>Assign public IPv4</strong></li>
+                        <li>Public IP: <strong>Assign public IPv4</strong> + IPv6</li>
                         <li>SSH Key: <strong>Generate key pair</strong> and SAVE both files!</li>
                     </ul>
+                    <p class="step-note"><strong>Auto-Setup:</strong> In "Management" section, paste the <a href="https://raw.githubusercontent.com/dokabi-recon67/helloworld/main/scripts/cloud-init.yaml" target="_blank">cloud-init script</a> to auto-install everything!</p>
                 </div>
 
                 <div class="step-card">
                     <div class="step-number">5</div>
                     <h3>Install HelloWorld Server</h3>
-                    <p>Connect to your VM via SSH and run:</p>
+                    <p><strong>If you used cloud-init:</strong> Skip this step - it's already installed!</p>
+                    <p><strong>If not:</strong> Connect to your VM via SSH and run:</p>
                     <pre><code>curl -sSL https://raw.githubusercontent.com/dokabi-recon67/helloworld/main/scripts/install_server.sh | sudo bash</code></pre>
                     <p class="step-note">Username is <code>opc</code> for Oracle Linux, <code>ubuntu</code> for Ubuntu</p>
                 </div>

@@ -172,9 +172,40 @@ Or if you have existing keys, select **Upload public key files** or **Paste publ
 
 Leave defaults (46.6 GB is fine and free)
 
+### Management (OPTIONAL - Auto Setup)
+
+This is optional but **highly recommended** - it auto-installs HelloWorld when your VM boots!
+
+1. Expand **Management** section (click "Show advanced options" if needed)
+
+2. **Instance metadata service:**
+   - Leave as default (IMDSv1 and IMDSv2)
+   - Don't check "Require authorization header" unless you know what you're doing
+
+3. **Initialization script (Cloud-init):**
+   - Select **Paste cloud-init script**
+   - Copy the entire contents from: [cloud-init.yaml](https://raw.githubusercontent.com/dokabi-recon67/helloworld/main/scripts/cloud-init.yaml)
+   - Paste it in the text box
+
+This script automatically:
+- Updates the system
+- Installs stunnel, SSH, Tor
+- Generates TLS certificates
+- Configures firewall (opens port 443)
+- Starts all services
+- Sets up Tor for optional anonymous mode
+
+4. **Tagging (Optional):**
+   - Key: `project`
+   - Value: `helloworld`
+
 ### Create
 
 Click **Create** and wait 2-5 minutes for your instance to be **Running**
+
+**If you used cloud-init:** Your server is already set up! Skip to Step 6 (connecting).
+
+**If you didn't use cloud-init:** You'll need to run the install script manually in Step 7.
 
 ---
 

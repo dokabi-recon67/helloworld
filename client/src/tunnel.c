@@ -441,57 +441,83 @@ static int start_stunnel(hw_ctx_t* ctx) {
     }
     
     // Verify port is actually listening
+    // In client mode, stunnel only binds to local port AFTER successful TLS handshake
+    // So we need to wait and retry multiple times
     hw_server_t* srv = &ctx->servers[ctx->current_server];
     int port_listening = 0;
+    int max_retries = 6;  // Total wait: 5s initial + 6*2s = 17 seconds max
+    int retry_count = 0;
+    
 #ifdef _WIN32
     // Check if port 2222 is listening by trying to connect
-    SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (sock != INVALID_SOCKET) {
-        struct sockaddr_in addr;
-        memset(&addr, 0, sizeof(addr));
-        addr.sin_family = AF_INET;
-        addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-        addr.sin_port = htons(HW_LOCAL_PORT);
-        
-        if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
-            port_listening = 1;
-        }
-        closesocket(sock);
-    }
-    
-    // If process is running but port not listening, wait longer
-    // Stunnel needs time to complete TLS handshake with server
-    if (!port_listening) {
-        HW_SLEEP(5000);  // Increased wait time for TLS handshake
-        // Check again
-        SOCKET sock2 = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-        if (sock2 != INVALID_SOCKET) {
-            struct sockaddr_in addr2;
-            memset(&addr2, 0, sizeof(addr2));
-            addr2.sin_family = AF_INET;
-            addr2.sin_addr.s_addr = inet_addr("127.0.0.1");
-            addr2.sin_port = htons(HW_LOCAL_PORT);
+    // Retry multiple times as stunnel needs to complete TLS handshake first
+    while (!port_listening && retry_count < max_retries && is_process_running(ctx->stunnel_proc)) {
+        SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (sock != INVALID_SOCKET) {
+            struct sockaddr_in addr;
+            memset(&addr, 0, sizeof(addr));
+            addr.sin_family = AF_INET;
+            addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+            addr.sin_port = htons(HW_LOCAL_PORT);
             
-            if (connect(sock2, (struct sockaddr*)&addr2, sizeof(addr2)) == 0) {
+            // Set socket to non-blocking for quick check
+            u_long mode = 1;
+            ioctlsocket(sock, FIONBIO, &mode);
+            
+            int result = connect(sock, (struct sockaddr*)&addr, sizeof(addr));
+            if (result == 0 || WSAGetLastError() == WSAEISCONN) {
                 port_listening = 1;
             }
-            closesocket(sock2);
+            closesocket(sock);
         }
         
-        if (!port_listening && is_process_running(ctx->stunnel_proc)) {
-            // Port still not listening but process running - might be connection issue
-            snprintf(ctx->error_msg, sizeof(ctx->error_msg),
-                     "Stunnel started but port %d not listening.\n\n"
-                     "Possible causes:\n"
-                     "1. Cannot connect to server %s:%d\n"
-                     "2. Server stunnel not running\n"
-                     "3. Firewall blocking connection\n\n"
-                     "Check server: ssh into server and run 'helloworld-status'",
-                     HW_LOCAL_PORT, srv->host, srv->port);
-            kill_process(ctx->stunnel_proc);
-            ctx->stunnel_proc = HW_INVALID_PROCESS;
-            return -1;
+        if (!port_listening) {
+            retry_count++;
+            if (retry_count < max_retries) {
+                HW_SLEEP(2000);  // Wait 2 seconds between retries
+            }
         }
+    }
+    
+    if (!port_listening && is_process_running(ctx->stunnel_proc)) {
+        // Port still not listening but process running - might be connection issue
+        // Check stunnel logs for more details
+        char log_path[HW_MAX_PATH_LEN];
+        char stunnel_log[512] = {0};
+        snprintf(log_path, sizeof(log_path), "%s%sstunnel.log", ctx->config_dir, HW_PATH_SEP);
+        FILE* log_file = fopen(log_path, "r");
+        if (log_file) {
+            fseek(log_file, -256, SEEK_END);
+            fread(stunnel_log, 1, sizeof(stunnel_log) - 1, log_file);
+            fclose(log_file);
+        }
+        
+        snprintf(ctx->error_msg, sizeof(ctx->error_msg),
+                 "Stunnel started but port %d not listening after %d seconds.\n\n"
+                 "Stunnel process is running but hasn't bound to local port.\n"
+                 "This usually means stunnel cannot complete TLS handshake with server.\n\n"
+                 "Server: %s:%d\n"
+                 "Local port: %d\n\n"
+                 "%s\n\n"
+                 "Possible causes:\n"
+                 "1. Cannot connect to server %s:%d (network/firewall issue)\n"
+                 "2. Server stunnel not running or rejecting connections\n"
+                 "3. TLS handshake failing (check server logs)\n"
+                 "4. Server certificate/configuration mismatch\n\n"
+                 "Troubleshooting:\n"
+                 "- Check server: ssh into server and run 'helloworld-status'\n"
+                 "- Check server logs: sudo tail -50 /var/log/helloworld-stunnel.log\n"
+                 "- Test manually: \"C:\\Program Files (x86)\\stunnel\\bin\\stunnel.exe\" \"%s\"",
+                 HW_LOCAL_PORT, 5 + (retry_count * 2),
+                 srv->host, srv->port, HW_LOCAL_PORT,
+                 stunnel_log[0] ? stunnel_log : "No stunnel log entries found.",
+                 srv->host, srv->port, log_path);
+        kill_process(ctx->stunnel_proc);
+        ctx->stunnel_proc = HW_INVALID_PROCESS;
+        return -1;
+    } else if (!is_process_running(ctx->stunnel_proc)) {
+        // Process exited - already handled above
+        return -1;
     }
 #endif
     

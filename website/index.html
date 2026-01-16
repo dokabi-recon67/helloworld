@@ -75,79 +75,127 @@
             <h2>Quick Start Guide</h2>
             
             <div class="guide-banner">
-                <p>Need detailed step-by-step with screenshots? See the <a href="https://github.com/dokabi-recon67/helloworld/blob/main/docs/SETUP_SERVER.md" target="_blank">Complete Oracle Cloud Setup Guide</a></p>
+                <p>Need even more detail? See the <a href="https://github.com/dokabi-recon67/helloworld/blob/main/docs/SETUP_SERVER.md" target="_blank">Complete Step-by-Step Guide</a> with all settings explained</p>
             </div>
             
             <div class="steps-simple">
                 <div class="step-card">
                     <div class="step-number">1</div>
                     <h3>Create Oracle Cloud Account</h3>
-                    <p>Go to <a href="https://cloud.oracle.com" target="_blank">cloud.oracle.com</a> and sign up for free. Add a card for verification (you will NOT be charged for Always Free resources).</p>
+                    <p>Go to <a href="https://cloud.oracle.com" target="_blank">cloud.oracle.com</a> and click <strong>Sign Up</strong>.</p>
+                    <ul class="simple-list">
+                        <li>Enter email, verify it</li>
+                        <li>Fill in name, address, phone</li>
+                        <li>Add credit card (for verification only - you will NOT be charged)</li>
+                        <li>Wait for account activation</li>
+                    </ul>
                 </div>
 
                 <div class="step-card">
                     <div class="step-number">2</div>
                     <h3>Create a Network (VCN)</h3>
-                    <p>In Oracle Cloud Console: <strong>Networking</strong> > <strong>Virtual Cloud Networks</strong> > <strong>Start VCN Wizard</strong> > Select "Create VCN with Internet Connectivity".</p>
+                    <p>Menu (☰) > <strong>Networking</strong> > <strong>Virtual Cloud Networks</strong> > <strong>Start VCN Wizard</strong></p>
                     <ul class="simple-list">
+                        <li>Select "Create VCN with Internet Connectivity"</li>
                         <li>VCN Name: <code>helloworld-vcn</code></li>
-                        <li>IPv4 CIDR Block: <code>10.0.0.0/16</code> (default)</li>
-                        <li>Use DNS hostnames: <strong>Checked</strong></li>
-                        <li>Add IPv6 Prefix: Click <strong>Add IPv6 Prefix</strong> > Select <strong>Oracle allocated /56</strong></li>
+                        <li>IPv4 CIDR: <code>10.0.0.0/16</code> (keep default)</li>
+                        <li>DNS hostnames: <strong>Check the box</strong></li>
+                        <li>IPv6: Click "Add IPv6 Prefix" > "Oracle allocated /56"</li>
+                        <li>Click <strong>Next</strong>, then <strong>Create</strong></li>
                     </ul>
                 </div>
 
                 <div class="step-card">
                     <div class="step-number">3</div>
-                    <h3>Open Port 443</h3>
-                    <p>In your VCN, click <strong>Public Subnet</strong> > <strong>Default Security List</strong> > <strong>Add Ingress Rules</strong>:</p>
+                    <h3>Open Port 443 (Security Rules)</h3>
+                    <p>In your VCN: <strong>Public Subnet</strong> > <strong>Default Security List</strong> > <strong>Add Ingress Rules</strong></p>
                     <ul class="simple-list">
-                        <li>Source CIDR: <code>0.0.0.0/0</code> (IPv4)</li>
-                        <li>Source CIDR: <code>::/0</code> (IPv6)</li>
-                        <li>Protocol: TCP, Port: <code>443</code></li>
+                        <li><strong>Rule 1:</strong> Source <code>0.0.0.0/0</code>, TCP, Port <code>443</code></li>
+                        <li><strong>Rule 2:</strong> Source <code>::/0</code>, TCP, Port <code>443</code></li>
+                        <li>Click <strong>Add Ingress Rules</strong></li>
                     </ul>
-                    <p class="step-note">Add both rules - one for IPv4, one for IPv6!</p>
+                    <p class="step-note">These rules allow your tunnel traffic through the firewall</p>
                 </div>
 
                 <div class="step-card">
                     <div class="step-number">4</div>
-                    <h3>Create Your VM</h3>
-                    <p><strong>Compute</strong> > <strong>Instances</strong> > <strong>Create Instance</strong></p>
+                    <h3>Create Your VM Instance</h3>
+                    <p>Menu (☰) > <strong>Compute</strong> > <strong>Instances</strong> > <strong>Create Instance</strong></p>
+                    
+                    <h4>Image & Shape:</h4>
                     <ul class="simple-list">
-                        <li>Image: <strong>Oracle Linux 9</strong> or Ubuntu</li>
+                        <li>Image: <strong>Oracle Linux 9</strong></li>
                         <li>Shape: <strong>VM.Standard.A1.Flex</strong> (Always Free!)</li>
-                        <li>OCPUs: 2-4, Memory: 12-24 GB (all free)</li>
-                        <li>Network: Your VCN, Public Subnet</li>
-                        <li>Public IP: <strong>Assign public IPv4</strong> + IPv6</li>
-                        <li>SSH Key: <strong>Generate key pair</strong> and SAVE both files!</li>
+                        <li>OCPUs: <code>2</code>, Memory: <code>12 GB</code></li>
                     </ul>
+                    
+                    <h4>Networking:</h4>
+                    <ul class="simple-list">
+                        <li>VCN: Select <strong>helloworld-vcn</strong></li>
+                        <li>Subnet: <strong>Public Subnet</strong> (or create new public subnet)</li>
+                        <li>Public IPv4: <strong>CHECK THIS BOX!</strong></li>
+                    </ul>
+                    
+                    <h4>SSH Keys:</h4>
+                    <ul class="simple-list">
+                        <li>Select <strong>"Generate a key pair for me"</strong></li>
+                        <li>Click <strong>Download private key</strong> - SAVE THIS FILE!</li>
+                        <li>Click <strong>Download public key</strong> - Save this too</li>
+                    </ul>
+                    
                     <div class="cloud-init-box">
-                        <h4>Auto-Setup (Recommended)</h4>
-                        <p>In the "Management" section, upload this file to auto-install everything:</p>
+                        <h4>Auto-Setup (Recommended!)</h4>
+                        <p>In "Management" section, upload this file to auto-install everything:</p>
                         <a href="cloud-init.yaml" download="cloud-init.yaml" class="btn btn-download">Download cloud-init.yaml</a>
-                        <p class="small-note">Click "Choose cloud-init script file" and select this file</p>
+                        <p class="small-note">Show advanced options > Management > Choose cloud-init script file</p>
                     </div>
+                    
+                    <p class="step-note">Click <strong>Create</strong> and wait 2-5 minutes for "Running" status</p>
                 </div>
 
                 <div class="step-card">
                     <div class="step-number">5</div>
-                    <h3>Install HelloWorld Server</h3>
-                    <p><strong>If you used cloud-init:</strong> Skip this step - it's already installed!</p>
-                    <p><strong>If not:</strong> Connect to your VM via SSH and run:</p>
-                    <pre><code>curl -sSL https://raw.githubusercontent.com/dokabi-recon67/helloworld/main/scripts/install_server.sh | sudo bash</code></pre>
-                    <p class="step-note">Username is <code>opc</code> for Oracle Linux, <code>ubuntu</code> for Ubuntu</p>
+                    <h3>Get Your Server IP</h3>
+                    <p>Once your instance shows <strong>"Running"</strong>:</p>
+                    <ul class="simple-list">
+                        <li>Find <strong>"Public IP address"</strong> on the instance page</li>
+                        <li>Copy this IP (e.g., <code>129.153.xxx.xxx</code>)</li>
+                        <li>Save it - you'll need it for the client app!</li>
+                    </ul>
+                    <p class="step-note">If you used cloud-init, wait 5 more minutes for auto-setup to complete</p>
                 </div>
 
                 <div class="step-card">
                     <div class="step-number">6</div>
+                    <h3>Manual Install (Skip if you used cloud-init)</h3>
+                    <p>Connect to your VM via SSH and run:</p>
+                    <pre><code>curl -sSL https://raw.githubusercontent.com/dokabi-recon67/helloworld/main/scripts/install_server.sh | sudo bash</code></pre>
+                    <p class="step-note">SSH username is <code>opc</code> for Oracle Linux</p>
+                </div>
+
+                <div class="step-card">
+                    <div class="step-number">7</div>
                     <h3>Download Client and Connect</h3>
                     <ul class="simple-list">
                         <li>Download <a href="https://github.com/dokabi-recon67/helloworld/releases">HelloWorld for Windows/Mac</a></li>
-                        <li>Run the app, click <strong>+ ADD SERVER</strong></li>
-                        <li>Enter your VM's IP, port 443, browse to your SSH key</li>
-                        <li>Click <strong>CONNECT</strong></li>
+                        <li>Extract ZIP and run <strong>helloworld.exe</strong></li>
+                        <li>Click <strong>+ ADD</strong> button</li>
+                        <li>Enter: Name (anything), Host (your VM's IP), Port (<code>443</code>)</li>
+                        <li>Browse to your SSH private key file (<code>.key</code>)</li>
+                        <li>Username: <code>opc</code></li>
+                        <li>Click <strong>Add Server</strong>, then <strong>CONNECT</strong></li>
                     </ul>
-                    <p>Verify at <a href="https://api.ipify.org" target="_blank">api.ipify.org</a> - shows your VM's IP!</p>
+                </div>
+
+                <div class="step-card">
+                    <div class="step-number">8</div>
+                    <h3>Verify It Works!</h3>
+                    <p>Open your browser and go to: <a href="https://api.ipify.org" target="_blank">api.ipify.org</a></p>
+                    <ul class="simple-list">
+                        <li>You should see <strong>your VM's IP</strong>, not your home IP</li>
+                        <li>If not, enable <strong>Full Tunnel Mode</strong> in the app</li>
+                    </ul>
+                    <p class="step-note">Congratulations! Your traffic is now routed through your server!</p>
                 </div>
             </div>
 

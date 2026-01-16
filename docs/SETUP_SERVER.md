@@ -2,291 +2,348 @@
 
 This guide walks you through setting up your own private tunnel server on Oracle Cloud's **Always Free** tier. No credit card charges ever.
 
+**Time needed:** 15-20 minutes
+
 ---
 
 ## Step 1: Create Oracle Cloud Account
 
 1. Go to [cloud.oracle.com](https://cloud.oracle.com)
-2. Click **Sign Up**
+2. Click **Sign Up** (top right)
 3. Enter your email and country
-4. Verify your email
-5. Fill in your details (name, address)
-6. Add a credit card (required for verification, but **you will NOT be charged** for Always Free resources)
-7. Complete phone verification
+4. Check your email and click the verification link
+5. Fill in your details:
+   - First name, Last name
+   - Address, City, Country
+   - Phone number
+6. Add a credit card
+   - **Don't worry!** This is only for verification
+   - You will **NOT be charged** for Always Free resources
+7. Complete phone verification (they'll text you a code)
 8. Wait for account activation (usually instant, sometimes up to 24 hours)
+9. Once activated, sign in to the Oracle Cloud Console
 
 ---
 
 ## Step 2: Create a Virtual Cloud Network (VCN)
 
-Before creating your VM, you need a network.
+A VCN is like your private network in the cloud.
 
-1. Log into Oracle Cloud Console
-2. Click the hamburger menu (top left)
-3. Go to **Networking** > **Virtual Cloud Networks**
-4. Click **Start VCN Wizard**
-5. Select **Create VCN with Internet Connectivity**
-6. Click **Start VCN Wizard**
-7. Configure:
+### 2.1 Open VCN Wizard
 
-| Setting | Value |
-|---------|-------|
+1. Click the **hamburger menu** (☰) in the top left
+2. Go to **Networking** → **Virtual Cloud Networks**
+3. Click **Start VCN Wizard** (blue button)
+4. Select **"Create VCN with Internet Connectivity"**
+5. Click **Start VCN Wizard**
+
+### 2.2 Configure VCN
+
+| Field | What to Enter |
+|-------|---------------|
 | **VCN Name** | `helloworld-vcn` |
-| **Compartment** | Your root compartment |
-| **IPv4 CIDR Block** | `10.0.0.0/16` (default, leave as is) |
-| **Use DNS hostnames in this VCN** | **Checked** (recommended) |
+| **Compartment** | Your root compartment (default) |
+| **IPv4 CIDR Block** | `10.0.0.0/16` (leave default) |
+| **Use DNS hostnames in this VCN** | ✅ Check this box |
 
-### Adding IPv6 Support (Optional but Recommended)
+### 2.3 Add IPv6 (Optional but Recommended)
 
-8. Scroll down to **Add IPv6 Prefixes**
-9. Click **Add IPv6 Prefix**
-10. Configure:
+1. Scroll down to **"Add IPv6 Prefixes"**
+2. Click **"Add IPv6 Prefix"**
+3. Select **"Oracle allocated IPv6 /56 prefix"**
+4. Leave the prefix field empty (auto-assigned)
 
-| Setting | Value |
-|---------|-------|
-| **Prefix type** | **Oracle allocated IPv6 /56 prefix** |
-| **IPv6 prefix** | Leave blank (auto-assigned) |
+### 2.4 Create
 
-This gives you a `/56` block with ~4 sextillion IPv6 addresses (more than enough!).
-
-11. Click **Next**, then **Create**
-12. Wait for it to complete
-
-**Note on CIDR:** The default `10.0.0.0/16` gives you 65,536 private IPv4 addresses. The `/56` IPv6 prefix is also free and future-proofs your setup.
+1. Click **Next**
+2. Review your settings
+3. Click **Create**
+4. Wait for it to complete (shows green checkmarks)
+5. Click **View VCN** when done
 
 ---
 
-## Step 3: Configure Security List (Open Port 443)
+## Step 3: Open Port 443 (Security Rules)
 
-This allows your tunnel traffic through.
+This allows your tunnel traffic through the firewall.
 
-1. In your new VCN, click **Public Subnet-helloworld-vcn**
-2. Click the **Default Security List**
-3. Click **Add Ingress Rules**
+### 3.1 Navigate to Security List
 
-### Rule 1: IPv4 TCP 443
+1. In your VCN page, find **Subnets** section
+2. Click **"Public Subnet-helloworld-vcn"**
+3. Under **Security Lists**, click **"Default Security List for helloworld-vcn"**
+4. Click **"Add Ingress Rules"**
 
-| Setting | Value |
-|---------|-------|
-| Stateless | No (unchecked) |
-| Source Type | CIDR |
-| Source CIDR | `0.0.0.0/0` |
-| IP Protocol | TCP |
-| Destination Port Range | `443` |
-| Description | HelloWorld Tunnel IPv4 |
+### 3.2 Add IPv4 Rule (Required)
 
-Click **+ Another Ingress Rule** to add more rules:
+Click **"Add Ingress Rules"** and enter:
 
-### Rule 2: IPv6 TCP 443
+| Field | Value |
+|-------|-------|
+| **Stateless** | Leave unchecked |
+| **Source Type** | CIDR |
+| **Source CIDR** | `0.0.0.0/0` |
+| **IP Protocol** | TCP |
+| **Source Port Range** | Leave empty (All) |
+| **Destination Port Range** | `443` |
+| **Description** | `HelloWorld Tunnel IPv4` |
 
-| Setting | Value |
-|---------|-------|
-| Stateless | No (unchecked) |
-| Source Type | CIDR |
-| Source CIDR | `::/0` |
-| IP Protocol | TCP |
-| Destination Port Range | `443` |
-| Description | HelloWorld Tunnel IPv6 |
+### 3.3 Add IPv6 Rule (If you enabled IPv6)
 
-### Rule 3: IPv4 UDP 443 (Optional)
+Click **"+ Another Ingress Rule"** and enter:
 
-| Setting | Value |
-|---------|-------|
-| Source Type | CIDR |
-| Source CIDR | `0.0.0.0/0` |
-| IP Protocol | UDP |
-| Destination Port Range | `443` |
-| Description | HelloWorld UDP IPv4 |
+| Field | Value |
+|-------|-------|
+| **Stateless** | Leave unchecked |
+| **Source Type** | CIDR |
+| **Source CIDR** | `::/0` |
+| **IP Protocol** | TCP |
+| **Source Port Range** | Leave empty (All) |
+| **Destination Port Range** | `443` |
+| **Description** | `HelloWorld Tunnel IPv6` |
 
-### Rule 4: IPv6 UDP 443 (Optional)
+### 3.4 Save
 
-| Setting | Value |
-|---------|-------|
-| Source Type | CIDR |
-| Source CIDR | `::/0` |
-| IP Protocol | UDP |
-| Destination Port Range | `443` |
-| Description | HelloWorld UDP IPv6 |
-
-4. Click **Add Ingress Rules**
-
-**Summary of rules to add:**
-- `0.0.0.0/0` TCP 443 (IPv4)
-- `::/0` TCP 443 (IPv6)
-- `0.0.0.0/0` UDP 443 (IPv4, optional)
-- `::/0` UDP 443 (IPv6, optional)
+Click **"Add Ingress Rules"** to save all rules.
 
 ---
 
-## Step 4: Create Your Compute Instance
+## Step 4: Create Your VM Instance
 
-1. Click hamburger menu > **Compute** > **Instances**
-2. Click **Create Instance**
+### 4.1 Navigate to Instances
 
-### Basic Settings
+1. Click the **hamburger menu** (☰)
+2. Go to **Compute** → **Instances**
+3. Click **"Create Instance"** (blue button)
 
-| Setting | Recommended Value |
-|---------|-------------------|
-| **Name** | `helloworld-server` (or anything you like) |
+### 4.2 Name and Placement
+
+| Field | What to Enter |
+|-------|---------------|
+| **Name** | `helloworld-server` (or any name you like) |
 | **Compartment** | Your root compartment |
-| **Availability Domain** | Any AD that shows "Always Free-eligible" |
+| **Availability Domain** | Pick any AD (AD-1, AD-2, or AD-3) |
 
-### Image and Shape
+### 4.3 Image and Shape
 
-Click **Change Image**:
-- Select **Oracle Linux 9** (recommended) or **Ubuntu 22.04**
-- Click **Select Image**
+#### Change Image:
+1. Click **"Change Image"**
+2. Select **Oracle Linux** → **Oracle Linux 9**
+3. Click **"Select Image"**
 
-Click **Change Shape**:
-- **Instance Type:** Virtual Machine
-- **Shape Series:** Ampere (ARM-based, Always Free)
-- Select **VM.Standard.A1.Flex**
-- Configure OCPUs and Memory:
+#### Change Shape:
+1. Click **"Change Shape"**
+2. Select **"Ampere"** (ARM processor - Always Free!)
+3. Check **"VM.Standard.A1.Flex"**
+4. Configure resources:
 
-| Resource | Free Tier Limit | Recommended |
-|----------|-----------------|-------------|
-| OCPUs | Up to 4 | **2** |
-| Memory | Up to 24 GB | **12 GB** |
+| Resource | Recommended (Free) |
+|----------|-------------------|
+| **Number of OCPUs** | `2` (can use up to 4 free) |
+| **Amount of memory (GB)** | `12` (can use up to 24 free) |
 
-Click **Select Shape**
+5. Click **"Select Shape"**
 
-### Networking
+### 4.4 Networking (IMPORTANT!)
 
-| Setting | Value |
-|---------|-------|
-| Virtual Cloud Network | `helloworld-vcn` (the one you created) |
-| Subnet | Public Subnet |
-| Public IPv4 Address | **Assign a public IPv4 address** (IMPORTANT!) |
-| Public IPv6 Address | **Assign a public IPv6 address** (if you added IPv6 to VCN) |
+#### Primary VNIC:
 
-### SSH Keys (IMPORTANT!)
+| Field | What to Select |
+|-------|----------------|
+| **VNIC name** | `helloworld` |
+| **Virtual cloud network** | Select **"helloworld-vcn"** (the one you created) |
 
-Select **Generate a key pair**:
-1. Click **Save Private Key** - downloads a `.key` file
-2. Click **Save Public Key** - downloads a `.pub` file
-3. **SAVE THESE FILES SECURELY** - you need them to connect!
+#### Subnet:
 
-Or if you have existing keys, select **Upload public key files** or **Paste public keys**
+**Option A - Use existing subnet (Recommended):**
+1. Select **"Select existing subnet"**
+2. Choose **"Public Subnet-helloworld-vcn"**
 
-### Boot Volume
+**Option B - If no subnets appear:**
+1. Select **"Create new public subnet"**
+2. Enter:
+   - **New subnet name:** `helloworld-public`
+   - **CIDR block:** `10.0.0.0/24`
 
-Leave defaults (46.6 GB is fine and free)
+#### IP Addresses:
 
-### Management (OPTIONAL - Auto Setup)
+| Field | What to Do |
+|-------|------------|
+| **Private IPv4 address** | Select **"Automatically assign"** |
+| **Public IPv4 address** | ✅ **CHECK THIS BOX** (Critical!) |
+| **IPv6 address** | ✅ Check if available (optional) |
 
-This is optional but **highly recommended** - it auto-installs HelloWorld when your VM boots!
+⚠️ **If you can't check "Public IPv4"**: Make sure you selected a **PUBLIC** subnet, not private!
 
-1. Expand **Management** section (click "Show advanced options" if needed)
+### 4.5 SSH Keys (VERY IMPORTANT!)
 
-2. **Instance metadata service:**
-   - Leave as default (IMDSv1 and IMDSv2)
-   - Don't check "Require authorization header" unless you know what you're doing
+1. Select **"Generate a key pair for me"**
+2. Click **"Download private key"** → **SAVE THIS FILE!**
+   - File name will be like: `ssh-key-2026-01-16.key`
+3. Click **"Download public key"** → Save this too
+   - File name will be like: `ssh-key-2026-01-16.key.pub`
 
-3. **Initialization script (Cloud-init):**
-   - Select **Paste cloud-init script**
-   - Copy the entire contents from: [cloud-init.yaml](https://raw.githubusercontent.com/dokabi-recon67/helloworld/main/scripts/cloud-init.yaml)
-   - Paste it in the text box
+⚠️ **Oracle will NOT show these keys again!** Save them somewhere safe!
 
-This script automatically:
-- Updates the system
-- Installs stunnel, SSH, Tor
-- Generates TLS certificates
-- Configures firewall (opens port 443)
-- Starts all services
-- Sets up Tor for optional anonymous mode
+### 4.6 Boot Volume
 
-4. **Tagging (Optional):**
+Leave all defaults (46.6 GB is fine and free)
+
+### 4.7 Management - Auto Setup (RECOMMENDED!)
+
+This automatically installs HelloWorld when your VM boots!
+
+1. Scroll down and click **"Show advanced options"**
+2. Go to **"Management"** tab
+3. Find **"Cloud-init script"**
+4. Select **"Choose cloud-init script file"** or **"Paste cloud-init script"**
+5. Download and upload this file: [cloud-init.yaml](https://helloworld-tv5t.onrender.com/cloud-init.yaml)
+
+   **Or paste the script directly:** Go to https://raw.githubusercontent.com/dokabi-recon67/helloworld/main/scripts/cloud-init.yaml and copy all text.
+
+6. **Instance metadata service:** Leave as default (don't check "Require authorization header")
+
+7. **Tagging (optional):**
    - Key: `project`
    - Value: `helloworld`
 
-### Create
+### 4.8 Create the Instance
 
-Click **Create** and wait 2-5 minutes for your instance to be **Running**
-
-**If you used cloud-init:** Your server is already set up! Skip to Step 6 (connecting).
-
-**If you didn't use cloud-init:** You'll need to run the install script manually in Step 7.
+1. Review all your settings
+2. Click **"Create"** (blue button at bottom)
+3. Wait 2-5 minutes for instance to show **"Running"**
 
 ---
 
-## Step 5: Note Your Public IP
+## Step 5: Get Your Server's IP Address
 
-Once your instance shows **Running**:
-1. Look for **Public IP Address** on the instance details page
-2. Copy this IP - you'll need it for the client!
-
-Example: `129.153.xxx.xxx`
+1. Once your instance shows **"Running"**, look at the instance details page
+2. Find **"Public IP address"** in the **"Instance access"** section
+3. Copy this IP address (example: `129.153.xxx.xxx`)
+4. Save it somewhere - you'll need it for the client!
 
 ---
 
-## Step 6: Connect to Your Server
+## Step 6: Wait for Auto-Setup (If You Used Cloud-Init)
 
-### Windows (PowerShell)
+If you uploaded the cloud-init script, your server is setting itself up automatically!
 
+Wait about **5 minutes** after the instance is "Running" for everything to install.
+
+**Skip to Step 8** if you used cloud-init.
+
+---
+
+## Step 7: Manual Setup (Only If You Didn't Use Cloud-Init)
+
+If you didn't use the cloud-init script, install manually:
+
+### 7.1 Connect to Your Server
+
+**On Windows (PowerShell):**
 ```powershell
 # Navigate to where you saved your key
 cd Downloads
 
-# Set correct permissions on key file
-icacls "ssh-key-*.key" /inheritance:r /grant:r "$($env:USERNAME):R"
+# Fix key permissions
+icacls "ssh-key-2026-01-16.key" /inheritance:r /grant:r "$($env:USERNAME):R"
 
-# Connect (replace IP and key filename)
-ssh -i "ssh-key-2024-01-15.key" opc@YOUR_PUBLIC_IP
+# Connect (replace with YOUR IP)
+ssh -i "ssh-key-2026-01-16.key" opc@YOUR_PUBLIC_IP
 ```
 
-### Mac/Linux (Terminal)
-
+**On Mac/Linux (Terminal):**
 ```bash
-# Set correct permissions
-chmod 400 ~/Downloads/ssh-key-*.key
+# Fix key permissions
+chmod 400 ~/Downloads/ssh-key-2026-01-16.key
 
-# Connect (replace IP and key filename)  
-ssh -i ~/Downloads/ssh-key-*.key opc@YOUR_PUBLIC_IP
+# Connect (replace with YOUR IP)
+ssh -i ~/Downloads/ssh-key-2026-01-16.key opc@YOUR_PUBLIC_IP
 ```
 
-**Note:** For Oracle Linux, username is `opc`. For Ubuntu, it's `ubuntu`.
+### 7.2 Run the Installer
 
----
-
-## Step 7: Install HelloWorld Server
-
-Once connected via SSH, run this single command:
-
+Once connected, run this single command:
 ```bash
 curl -sSL https://raw.githubusercontent.com/dokabi-recon67/helloworld/main/scripts/install_server.sh | sudo bash
 ```
 
-This automatically:
-- Installs all dependencies
-- Configures stunnel for TLS wrapping
-- Sets up SSH tunnel endpoint
-- Configures firewall rules
-- Starts all services
+Wait for it to complete (about 2-3 minutes).
 
 ---
 
-## Step 8: Configure HelloWorld Client
+## Step 8: Download and Set Up the Client
 
-On your PC/Mac:
+### 8.1 Download HelloWorld Client
 
-1. Open HelloWorld app
-2. Click **+ ADD SERVER**
-3. Enter:
-   - **Name:** Anything (e.g., "Oracle Server")
-   - **Host:** Your VM's public IP
-   - **Port:** 443
-   - **SSH Key:** Browse to your `.key` file
-   - **Username:** `opc` (Oracle Linux) or `ubuntu` (Ubuntu)
-4. Click **Add Server**
-5. Click **CONNECT**
+Go to: https://github.com/dokabi-recon67/helloworld/releases
+
+Download:
+- **Windows:** `HelloWorld-win64.zip`
+- **Mac:** `HelloWorld-macos.zip`
+
+### 8.2 Extract and Run
+
+**Windows:**
+1. Right-click the ZIP → **"Extract All"**
+2. Open the extracted folder
+3. Double-click **`helloworld.exe`**
+
+**Mac:**
+1. Double-click the ZIP to extract
+2. Open the extracted folder
+3. Double-click **`HelloWorld.app`**
+4. If blocked: Right-click → Open → Open
+
+### 8.3 Add Your Server
+
+1. In the HelloWorld app, click **"+ ADD"** button
+2. Fill in:
+
+| Field | What to Enter |
+|-------|---------------|
+| **Server Name** | Anything you want (e.g., "My Oracle Server") |
+| **Host** | Your VM's public IP address |
+| **Port** | `443` |
+| **SSH Key** | Click Browse, select your `.key` file |
+| **Username** | `opc` (for Oracle Linux) |
+
+3. Click **"Add Server"**
+
+### 8.4 Connect!
+
+1. Select your server from the dropdown
+2. Click **"CONNECT"**
+3. Wait a few seconds for the connection
 
 ---
 
-## Step 9: Verify It Works
+## Step 9: Verify It's Working
 
-1. Open your browser
-2. Go to [api.ipify.org](https://api.ipify.org)
-3. You should see your **Oracle VM's IP**, not your home IP!
+1. Open your web browser
+2. Go to: https://api.ipify.org
+3. You should see **your VM's IP address**, NOT your home IP!
+
+**If you see your VM's IP:** Congratulations! Everything is working!
+
+**If you see your home IP:** Make sure "Full Tunnel Mode" is enabled in the app.
+
+---
+
+## Server Commands (Optional)
+
+SSH into your server and run these commands:
+
+```bash
+# Check status of everything
+helloworld-status
+
+# Get a new Tor IP (when using Tor mode)
+helloworld-rotate
+
+# View setup log
+cat /var/log/helloworld-setup.log
+```
 
 ---
 
@@ -295,73 +352,65 @@ On your PC/Mac:
 ### "Connection refused" or timeout
 - Check Security List has port 443 open (Step 3)
 - Verify instance is **Running**
-- Check you're using the correct public IP
+- Make sure you're using the correct public IP
+- Wait 5 minutes if you just created the instance
 
 ### "Permission denied" SSH error
-- Make sure key file permissions are set (chmod 400)
-- Verify you're using the correct username (`opc` or `ubuntu`)
-- Confirm you're using the private key (`.key`), not public (`.pub`)
+- Make sure key file permissions are set correctly
+- Windows: Run the `icacls` command shown above
+- Mac/Linux: Run `chmod 400 your-key.key`
+- Verify you're using `opc` as username (not `root`)
 
-### Instance won't create
-- Try a different Availability Domain
-- A1.Flex is limited - if unavailable, try `VM.Standard.E2.1.Micro` (x86, also free)
+### Can't check "Public IPv4 address"
+- You selected a private subnet
+- Go back to Networking and select a PUBLIC subnet
 
-### "Host key verification failed"
-```bash
-ssh-keygen -R YOUR_SERVER_IP
-```
-Then try connecting again.
+### Instance won't create / "Out of capacity"
+- Try a different Availability Domain (AD-1, AD-2, or AD-3)
+- A1.Flex shape has limited availability
+- Try `VM.Standard.E2.1.Micro` shape instead (also free, x86)
+
+### Cloud-init didn't run
+- Check the log: `sudo cat /var/log/cloud-init-output.log`
+- Run manual install (Step 7)
+
+### App says "Connected" but IP didn't change
+- Enable **"Full Tunnel Mode"** toggle in the app
+- Restart the app and reconnect
 
 ---
 
-## Oracle Cloud Always Free Limits
+## Optional: Reserve Your IP Address
+
+By default, your public IP may change if you stop/restart the instance. To keep it permanent:
+
+1. Go to **Networking** → **IP Management** → **Reserved Public IPs**
+2. Click **"Reserve Public IP Address"**
+3. Enter a name (e.g., `helloworld-ip`)
+4. Click **"Reserve"**
+5. Go to your instance → **Attached VNICs** → Click the VNIC
+6. Click **IPv4 Addresses** → Click the ⋮ menu → **Edit**
+7. Change to your reserved IP
+8. Save
+
+Now your IP stays the same forever!
+
+---
+
+## Oracle Cloud Free Tier Limits
 
 | Resource | Free Amount |
 |----------|-------------|
 | A1 Flex Compute | 4 OCPUs, 24 GB RAM total |
 | E2.1 Micro | 2 instances |
 | Boot Volume | 200 GB total |
-| Block Volume | 200 GB total |
-| Object Storage | 20 GB |
 | Outbound Data | 10 TB/month |
 
-You can run HelloWorld well within these limits!
-
----
-
-## Security Best Practices
-
-1. **Never share your private SSH key**
-2. **Don't disable the firewall** on your VM
-3. **Keep your VM updated:**
-   ```bash
-   sudo dnf update -y  # Oracle Linux
-   sudo apt update && sudo apt upgrade -y  # Ubuntu
-   ```
-4. **Only open ports you need** (443 is all HelloWorld needs)
-
----
-
-## Optional: Reserve Your IP (Recommended)
-
-By default, if you stop/start your instance, the IP may change. To keep it:
-
-1. Go to **Networking** > **IP Management** > **Reserved Public IPs**
-2. Click **Reserve Public IP Address**
-3. Name it (e.g., `helloworld-ip`)
-4. Click **Reserve**
-5. Go back to your instance
-6. Under **Attached VNICs**, click the VNIC
-7. Click **IPv4 Addresses**
-8. Click the three dots menu > **Edit**
-9. Select your reserved IP
-10. Save
-
-Now your IP stays the same forever!
+HelloWorld works well within these limits!
 
 ---
 
 ## Need Help?
 
-- GitHub Issues: https://github.com/dokabi-recon67/helloworld/issues
-- Oracle Cloud Docs: https://docs.oracle.com/en-us/iaas/Content/home.htm
+- **GitHub Issues:** https://github.com/dokabi-recon67/helloworld/issues
+- **Oracle Cloud Docs:** https://docs.oracle.com/en-us/iaas/Content/home.htm

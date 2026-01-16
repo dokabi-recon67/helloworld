@@ -148,7 +148,8 @@ static int write_stunnel_config(hw_ctx_t* ctx) {
     fprintf(f, "verifyChain = no\n");
     fprintf(f, "verifyPeer = no\n");
     fprintf(f, "sslVersion = all\n");
-    fprintf(f, "sni = %s\n", srv->host);
+    // SNI can cause issues with self-signed certs, try without it first
+    // fprintf(f, "sni = %s\n", srv->host);
     
     fclose(f);
     return 0;

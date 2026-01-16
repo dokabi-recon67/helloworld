@@ -11,14 +11,12 @@ static HANDLE launch_process(const char* exe_path, const char* args) {
     STARTUPINFOA si = {0};
     PROCESS_INFORMATION pi = {0};
     si.cb = sizeof(si);
-    si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
+    si.dwFlags = STARTF_USESHOWWINDOW;
     si.wShowWindow = SW_HIDE;
-    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-    si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-    si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
     
     char cmdline[HW_BUFFER_SIZE];
     if (args && args[0]) {
+        // Build command line: "exe_path" args
         snprintf(cmdline, sizeof(cmdline), "\"%s\" %s", exe_path, args);
     } else {
         snprintf(cmdline, sizeof(cmdline), "\"%s\"", exe_path);
@@ -28,7 +26,8 @@ static HANDLE launch_process(const char* exe_path, const char* args) {
     
     // Use lpApplicationName for the executable path (handles spaces correctly)
     // and lpCommandLine for the full command with arguments
-    if (CreateProcessA(exe_path, cmdline, NULL, NULL, TRUE,
+    // Note: If lpApplicationName is not NULL, lpCommandLine can be just the arguments
+    if (CreateProcessA(exe_path, cmdline, NULL, NULL, FALSE,
                        flags, NULL, NULL, &si, &pi)) {
         CloseHandle(pi.hThread);
         return pi.hProcess;
@@ -297,14 +296,21 @@ static int start_stunnel(hw_ctx_t* ctx) {
     ctx->stunnel_proc = launch_process(stunnel_exe, cmd);
     if (ctx->stunnel_proc == HW_INVALID_PROCESS) {
         DWORD err = GetLastError();
+        char err_msg[256] = {0};
+        FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                       NULL, err, 0, err_msg, sizeof(err_msg), NULL);
         snprintf(ctx->error_msg, sizeof(ctx->error_msg),
-                 "Failed to start stunnel process.\n"
-                 "Command: %s\n"
-                 "Error code: %lu\n"
-                 "Path: %s\n"
+                 "Failed to start stunnel process.\n\n"
+                 "Executable: %s\n"
                  "Config: %s\n"
-                 "Make sure stunnel is installed correctly.",
-                 cmd, err, stunnel_exe, config_path);
+                 "Error code: %lu\n"
+                 "Error: %s\n\n"
+                 "Troubleshooting:\n"
+                 "1. Verify stunnel is installed: %s\n"
+                 "2. Check if config file exists: %s\n"
+                 "3. Try running manually: \"%s\" \"%s\"",
+                 stunnel_exe, config_path, err, err_msg[0] ? err_msg : "Unknown error",
+                 stunnel_exe, config_path, stunnel_exe, config_path);
         return -1;
     }
 #else

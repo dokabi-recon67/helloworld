@@ -94,25 +94,46 @@ static int check_stunnel_installed(void) {
 #ifdef _WIN32
     char path[MAX_PATH];
     DWORD result = SearchPathA(NULL, "stunnel.exe", NULL, MAX_PATH, path, NULL);
-    if (result > 0) {
+    if (result > 0 && result < MAX_PATH) {
         DWORD attrs = GetFileAttributesA(path);
         if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
             return 1;
         }
     }
     
+    // Check common installation paths first (most likely locations)
     const char* common_paths[] = {
         "C:\\Program Files (x86)\\stunnel\\bin\\stunnel.exe",
         "C:\\Program Files\\stunnel\\bin\\stunnel.exe",
-        "C:\\stunnel\\bin\\stunnel.exe"
+        "C:\\stunnel\\bin\\stunnel.exe",
+        "C:\\Program Files (x86)\\stunnel\\stunnel.exe",
+        "C:\\Program Files\\stunnel\\stunnel.exe"
     };
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 5; i++) {
         DWORD attrs = GetFileAttributesA(common_paths[i]);
         if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
             return 1;
         }
     }
     
+    // Check Program Files (x86) using system folder
+    char program_files_x86[MAX_PATH];
+    if (SHGetSpecialFolderPathA(NULL, program_files_x86, CSIDL_PROGRAM_FILESX86, FALSE)) {
+        char full_path[MAX_PATH];
+        snprintf(full_path, sizeof(full_path), "%s\\stunnel\\bin\\stunnel.exe", program_files_x86);
+        DWORD attrs = GetFileAttributesA(full_path);
+        if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+            return 1;
+        }
+        // Also check root of stunnel folder
+        snprintf(full_path, sizeof(full_path), "%s\\stunnel\\stunnel.exe", program_files_x86);
+        attrs = GetFileAttributesA(full_path);
+        if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+            return 1;
+        }
+    }
+    
+    // Check Program Files using system folder
     char program_files[MAX_PATH];
     if (SHGetSpecialFolderPathA(NULL, program_files, CSIDL_PROGRAM_FILES, FALSE)) {
         char full_path[MAX_PATH];
@@ -121,12 +142,19 @@ static int check_stunnel_installed(void) {
         if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
             return 1;
         }
+        // Also check root of stunnel folder
+        snprintf(full_path, sizeof(full_path), "%s\\stunnel\\stunnel.exe", program_files);
+        attrs = GetFileAttributesA(full_path);
+        if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+            return 1;
+        }
     }
     
-    char program_files_x86[MAX_PATH];
-    if (SHGetSpecialFolderPathA(NULL, program_files_x86, CSIDL_PROGRAM_FILESX86, FALSE)) {
+    // Check AppData Local (portable installations)
+    char appdata_local[MAX_PATH];
+    if (SHGetSpecialFolderPathA(NULL, appdata_local, CSIDL_LOCAL_APPDATA, FALSE)) {
         char full_path[MAX_PATH];
-        snprintf(full_path, sizeof(full_path), "%s\\stunnel\\bin\\stunnel.exe", program_files_x86);
+        snprintf(full_path, sizeof(full_path), "%s\\stunnel\\bin\\stunnel.exe", appdata_local);
         DWORD attrs = GetFileAttributesA(full_path);
         if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
             return 1;
@@ -177,9 +205,11 @@ static int start_stunnel(hw_ctx_t* ctx) {
         const char* common_paths[] = {
             "C:\\Program Files (x86)\\stunnel\\bin\\stunnel.exe",
             "C:\\Program Files\\stunnel\\bin\\stunnel.exe",
-            "C:\\stunnel\\bin\\stunnel.exe"
+            "C:\\stunnel\\bin\\stunnel.exe",
+            "C:\\Program Files (x86)\\stunnel\\stunnel.exe",
+            "C:\\Program Files\\stunnel\\stunnel.exe"
         };
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 5; i++) {
             DWORD attrs = GetFileAttributesA(common_paths[i]);
             if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
                 snprintf(found_path, sizeof(found_path), "\"%s\"", common_paths[i]);
@@ -196,6 +226,13 @@ static int start_stunnel(hw_ctx_t* ctx) {
             DWORD attrs = GetFileAttributesA(full_path);
             if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
                 snprintf(found_path, sizeof(found_path), "\"%s\"", full_path);
+            } else {
+                // Also check root of stunnel folder
+                snprintf(full_path, sizeof(full_path), "%s\\stunnel\\stunnel.exe", program_files_x86);
+                attrs = GetFileAttributesA(full_path);
+                if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+                    snprintf(found_path, sizeof(found_path), "\"%s\"", full_path);
+                }
             }
         }
     }
@@ -208,6 +245,13 @@ static int start_stunnel(hw_ctx_t* ctx) {
             DWORD attrs = GetFileAttributesA(full_path);
             if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
                 snprintf(found_path, sizeof(found_path), "\"%s\"", full_path);
+            } else {
+                // Also check root of stunnel folder
+                snprintf(full_path, sizeof(full_path), "%s\\stunnel\\stunnel.exe", program_files);
+                attrs = GetFileAttributesA(full_path);
+                if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+                    snprintf(found_path, sizeof(found_path), "\"%s\"", full_path);
+                }
             }
         }
     }

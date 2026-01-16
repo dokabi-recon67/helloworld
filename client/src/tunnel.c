@@ -16,7 +16,9 @@ static HANDLE launch_process(const char* exe_path, const char* args) {
     
     char cmdline[HW_BUFFER_SIZE];
     if (args && args[0]) {
-        // Build command line: "exe_path" args
+        // When lpApplicationName is provided, lpCommandLine should contain
+        // the full command line including executable name OR just arguments
+        // We'll use full command line for compatibility
         snprintf(cmdline, sizeof(cmdline), "\"%s\" %s", exe_path, args);
     } else {
         snprintf(cmdline, sizeof(cmdline), "\"%s\"", exe_path);
@@ -24,14 +26,21 @@ static HANDLE launch_process(const char* exe_path, const char* args) {
     
     DWORD flags = CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP;
     
-    // Use lpApplicationName for the executable path (handles spaces correctly)
-    // and lpCommandLine for the full command with arguments
-    // Note: If lpApplicationName is not NULL, lpCommandLine can be just the arguments
+    // Try with lpApplicationName first (handles spaces correctly)
     if (CreateProcessA(exe_path, cmdline, NULL, NULL, FALSE,
                        flags, NULL, NULL, &si, &pi)) {
         CloseHandle(pi.hThread);
         return pi.hProcess;
     }
+    
+    // If that fails, try without lpApplicationName (fallback)
+    // This handles cases where lpApplicationName might cause issues
+    if (CreateProcessA(NULL, cmdline, NULL, NULL, FALSE,
+                       flags, NULL, NULL, &si, &pi)) {
+        CloseHandle(pi.hThread);
+        return pi.hProcess;
+    }
+    
     return NULL;
 }
 
@@ -329,8 +338,18 @@ static int start_stunnel(hw_ctx_t* ctx) {
     HW_SLEEP(1500);
     
     if (!is_process_running(ctx->stunnel_proc)) {
+        DWORD exit_code = 0;
+        GetExitCodeProcess(ctx->stunnel_proc, &exit_code);
         snprintf(ctx->error_msg, sizeof(ctx->error_msg),
-                 "stunnel exited unexpectedly.\nCheck if port %d is available.", HW_LOCAL_PORT);
+                 "stunnel exited unexpectedly (exit code: %lu).\n\n"
+                 "Possible causes:\n"
+                 "1. Port %d is already in use\n"
+                 "2. Config file error: %s\n"
+                 "3. Stunnel cannot connect to server\n"
+                 "4. Invalid stunnel configuration\n\n"
+                 "Try running manually:\n"
+                 "\"%s\" \"%s\"",
+                 exit_code, HW_LOCAL_PORT, config_path, stunnel_exe, config_path);
         return -1;
     }
     

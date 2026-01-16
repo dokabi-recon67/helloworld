@@ -225,10 +225,19 @@ static int start_stunnel(hw_ctx_t* ctx) {
     }
     
     char config_path[HW_MAX_PATH_LEN];
+    char config_path_abs[HW_MAX_PATH_LEN];
     char cmd[HW_BUFFER_SIZE];
     
     snprintf(config_path, sizeof(config_path), "%s%sstunnel.conf",
              ctx->config_dir, HW_PATH_SEP);
+    
+    // Get absolute path for stunnel (Windows needs this)
+#ifdef _WIN32
+    if (GetFullPathNameA(config_path, sizeof(config_path_abs), config_path_abs, NULL) > 0) {
+        strncpy(config_path, config_path_abs, sizeof(config_path) - 1);
+        config_path[sizeof(config_path) - 1] = '\0';
+    }
+#endif
     
 #ifdef _WIN32
     char stunnel_path[MAX_PATH] = "stunnel";

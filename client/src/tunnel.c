@@ -433,10 +433,11 @@ static int start_ssh(hw_ctx_t* ctx) {
 #ifdef _WIN32
         HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
         if (snapshot != INVALID_HANDLE_VALUE) {
-            PROCESSENTRY32A pe = {sizeof(pe)};
+            PROCESSENTRY32A pe;
+            pe.dwSize = sizeof(PROCESSENTRY32A);
             if (Process32FirstA(snapshot, &pe)) {
                 do {
-                    if (_stricmp(pe.szExeFile, "stunnel.exe") == 0) {
+                    if (strcmpi(pe.szExeFile, "stunnel.exe") == 0) {
                         stunnel_running = 1;
                         break;
                     }

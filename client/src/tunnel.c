@@ -6,6 +6,7 @@
 
 #ifdef _WIN32
 #include <shlobj.h>
+#include <tlhelp32.h>
 
 static HANDLE launch_process(const char* exe_path, const char* args) {
     STARTUPINFOA si = {0};
@@ -316,9 +317,10 @@ static int start_stunnel(hw_ctx_t* ctx) {
         memmove(stunnel_exe, stunnel_exe + 1, strlen(stunnel_exe));
     }
     
-    // Build command line with config file
-    snprintf(cmd, sizeof(cmd), "\"%s\"", config_path);
-    ctx->stunnel_proc = launch_process(stunnel_exe, cmd);
+    // Build FULL command line: "stunnel.exe" "config_path"
+    // Use NULL for lpApplicationName so CreateProcessA parses the full command
+    snprintf(cmd, sizeof(cmd), "\"%s\" \"%s\"", stunnel_exe, config_path);
+    ctx->stunnel_proc = launch_process(NULL, cmd);
     if (ctx->stunnel_proc == HW_INVALID_PROCESS) {
         DWORD err = GetLastError();
         char err_msg[256] = {0};

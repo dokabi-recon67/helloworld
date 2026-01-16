@@ -134,7 +134,24 @@ static HICON create_eye_icon(int size) {
     
     void* bits = NULL;
     HBITMAP hbmColor = CreateDIBSection(memDC, &bmi, DIB_RGB_COLORS, &bits, NULL, 0);
-    HBITMAP hbmMask = CreateBitmap(size, size, 1, 1, NULL);
+    
+    // Create proper mask bitmap (1 bit per pixel, white = transparent)
+    BITMAPINFO maskBmi = {0};
+    maskBmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    maskBmi.bmiHeader.biWidth = size;
+    maskBmi.bmiHeader.biHeight = size;
+    maskBmi.bmiHeader.biPlanes = 1;
+    maskBmi.bmiHeader.biBitCount = 1;
+    maskBmi.bmiHeader.biCompression = BI_RGB;
+    void* maskBits = NULL;
+    HBITMAP hbmMask = CreateDIBSection(memDC, &maskBmi, DIB_RGB_COLORS, &maskBits, NULL, 0);
+    
+    // Fill mask with white (transparent)
+    HDC maskDC = CreateCompatibleDC(memDC);
+    SelectObject(maskDC, hbmMask);
+    RECT maskRect = {0, 0, size, size};
+    FillRect(maskDC, &maskRect, (HBRUSH)GetStockObject(WHITE_BRUSH));
+    DeleteDC(maskDC);
     
     SelectObject(memDC, hbmColor);
     
@@ -147,10 +164,11 @@ static HICON create_eye_icon(int size) {
     int ew = size * 4 / 5;
     int eh = size * 2 / 5;
     
-    SolidBrush eyeBrush(Color(255, 20, 20, 25));
+    // Black eye icon (as requested)
+    SolidBrush eyeBrush(Color(255, 0, 0, 0));
     SolidBrush whiteBrush(Color(255, 240, 240, 245));
-    SolidBrush pupilBrush(Color(255, 5, 5, 8));
-    Pen outlinePen(Color(255, 60, 60, 70), 1.5f);
+    SolidBrush pupilBrush(Color(255, 0, 0, 0));
+    Pen outlinePen(Color(255, 40, 40, 50), 1.5f);
     
     g.FillEllipse(&eyeBrush, cx - ew/2, cy - eh/2, ew, eh);
     g.DrawEllipse(&outlinePen, cx - ew/2, cy - eh/2, ew, eh);
@@ -525,10 +543,16 @@ static LRESULT CALLBACK add_dlg_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) 
             CreateWindowA("STATIC", "e.g. C:\\Users\\You\\.ssh\\helloworld_key", WS_CHILD | WS_VISIBLE | SS_LEFT,
                 20, 287, 420, 16, hwnd, NULL, NULL, NULL);
             
-            CreateWindowA("BUTTON", "Add Server", WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
+            HWND btnAdd = CreateWindowA("BUTTON", "Add Server", 
+                WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP,
                 160, 315, 90, 30, hwnd, (HMENU)IDOK, NULL, NULL);
-            CreateWindowA("BUTTON", "Cancel", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+            HWND btnCancel = CreateWindowA("BUTTON", "Cancel", 
+                WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
                 270, 315, 60, 30, hwnd, (HMENU)IDCANCEL, NULL, NULL);
+            
+            // Ensure buttons are visible with proper colors
+            SendMessageA(btnAdd, WM_SETFONT, (WPARAM)font, TRUE);
+            SendMessageA(btnCancel, WM_SETFONT, (WPARAM)font, TRUE);
             
             for (HWND child = GetWindow(hwnd, GW_CHILD); child; child = GetWindow(child, GW_HWNDNEXT))
                 SendMessageA(child, WM_SETFONT, (WPARAM)font, TRUE);
@@ -841,12 +865,17 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show) {
     
     int w = 360, h = 580;
     g_hwnd = CreateWindowExA(WS_EX_APPWINDOW, "HelloWorldClass", "HelloWorld",
-        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+        WS_OVERLAPPEDWINDOW & ~WS_MAXIMIZEBOX,
         (GetSystemMetrics(SM_CXSCREEN)-w)/2, (GetSystemMetrics(SM_CYSCREEN)-h)/2,
         w, h, NULL, NULL, inst, NULL);
     
+    // Set window icons (for title bar and taskbar)
     SendMessage(g_hwnd, WM_SETICON, ICON_BIG, (LPARAM)g_icon);
     SendMessage(g_hwnd, WM_SETICON, ICON_SMALL, (LPARAM)iconSmall);
+    
+    // Also set class icon for better compatibility
+    SetClassLongPtrA(g_hwnd, GCLP_HICON, (LONG_PTR)g_icon);
+    SetClassLongPtrA(g_hwnd, GCLP_HICONSM, (LONG_PTR)iconSmall);
     
     ShowWindow(g_hwnd, show);
     UpdateWindow(g_hwnd);

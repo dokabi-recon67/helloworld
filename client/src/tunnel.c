@@ -142,6 +142,9 @@ static int write_stunnel_config(hw_ctx_t* ctx) {
     fprintf(f, "accept = 127.0.0.1:%d\n", HW_LOCAL_PORT);
     fprintf(f, "connect = %s:%d\n", srv->host, srv->port);
     fprintf(f, "verify = 0\n");
+    fprintf(f, "verifyChain = no\n");
+    fprintf(f, "verifyPeer = no\n");
+    fprintf(f, "sslVersion = all\n");
     fprintf(f, "sni = %s\n", srv->host);
     
     fclose(f);

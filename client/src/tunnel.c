@@ -400,25 +400,6 @@ static int start_stunnel(hw_ctx_t* ctx) {
     
     HW_SLEEP(2000);
     
-    // Verify port is actually listening
-    int port_listening = 0;
-#ifdef _WIN32
-    // Check if port 2222 is listening
-    SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (sock != INVALID_SOCKET) {
-        struct sockaddr_in addr;
-        memset(&addr, 0, sizeof(addr));
-        addr.sin_family = AF_INET;
-        addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-        addr.sin_port = htons(HW_LOCAL_PORT);
-        
-        if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
-            port_listening = 1;
-        }
-        closesocket(sock);
-    }
-#endif
-    
     if (!is_process_running(ctx->stunnel_proc)) {
         DWORD exit_code = 0;
         GetExitCodeProcess(ctx->stunnel_proc, &exit_code);
@@ -454,6 +435,7 @@ static int start_stunnel(hw_ctx_t* ctx) {
     }
     
     // Verify port is actually listening
+    hw_server_t* srv = &ctx->servers[ctx->current_server];
     int port_listening = 0;
 #ifdef _WIN32
     // Check if port 2222 is listening by trying to connect

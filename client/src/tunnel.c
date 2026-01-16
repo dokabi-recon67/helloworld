@@ -128,8 +128,10 @@ static int write_stunnel_config(hw_ctx_t* ctx) {
 #ifdef _WIN32
     // Windows stunnel doesn't use pid = in config
     fprintf(f, "foreground = no\n");
-    fprintf(f, "debug = 0\n");
-    fprintf(f, "output =\n");
+    fprintf(f, "debug = 7\n");
+    char log_path[HW_MAX_PATH_LEN];
+    snprintf(log_path, sizeof(log_path), "%s%sstunnel.log", ctx->config_dir, HW_PATH_SEP);
+    fprintf(f, "output = %s\n", log_path);
 #else
     fprintf(f, "pid =\n");
     fprintf(f, "foreground = no\n");

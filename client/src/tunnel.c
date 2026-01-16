@@ -7,7 +7,7 @@
 #ifdef _WIN32
 #include <shlobj.h>
 
-static HANDLE launch_process(const char* cmd) {
+static HANDLE launch_process(const char* exe_path, const char* args) {
     STARTUPINFOA si = {0};
     PROCESS_INFORMATION pi = {0};
     si.cb = sizeof(si);
@@ -18,12 +18,17 @@ static HANDLE launch_process(const char* cmd) {
     si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
     
     char cmdline[HW_BUFFER_SIZE];
-    strncpy(cmdline, cmd, sizeof(cmdline) - 1);
-    cmdline[sizeof(cmdline) - 1] = '\0';
+    if (args && args[0]) {
+        snprintf(cmdline, sizeof(cmdline), "\"%s\" %s", exe_path, args);
+    } else {
+        snprintf(cmdline, sizeof(cmdline), "\"%s\"", exe_path);
+    }
     
     DWORD flags = CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP;
     
-    if (CreateProcessA(NULL, cmdline, NULL, NULL, TRUE,
+    // Use lpApplicationName for the executable path (handles spaces correctly)
+    // and lpCommandLine for the full command with arguments
+    if (CreateProcessA(exe_path, cmdline, NULL, NULL, TRUE,
                        flags, NULL, NULL, &si, &pi)) {
         CloseHandle(pi.hThread);
         return pi.hProcess;
@@ -47,11 +52,17 @@ static int is_process_running(HANDLE proc) {
 
 #else
 
-static pid_t launch_process(const char* cmd) {
+static pid_t launch_process(const char* exe_path, const char* args) {
     pid_t pid = fork();
     if (pid == 0) {
         setsid();
-        execl("/bin/sh", "sh", "-c", cmd, NULL);
+        if (args && args[0]) {
+            char cmd[HW_BUFFER_SIZE];
+            snprintf(cmd, sizeof(cmd), "%s %s", exe_path, args);
+            execl("/bin/sh", "sh", "-c", cmd, NULL);
+        } else {
+            execl("/bin/sh", "sh", "-c", exe_path, NULL);
+        }
         _exit(127);
     }
     return pid;
@@ -282,14 +293,9 @@ static int start_stunnel(hw_ctx_t* ctx) {
     }
     
     // Build command line with config file
-    snprintf(cmd, sizeof(cmd), "\"%s\" \"%s\"", stunnel_exe, config_path);
-#else
-    snprintf(cmd, sizeof(cmd), "stunnel \"%s\"", config_path);
-#endif
-    
-    ctx->stunnel_proc = launch_process(cmd);
+    snprintf(cmd, sizeof(cmd), "\"%s\"", config_path);
+    ctx->stunnel_proc = launch_process(stunnel_exe, cmd);
     if (ctx->stunnel_proc == HW_INVALID_PROCESS) {
-#ifdef _WIN32
         DWORD err = GetLastError();
         snprintf(ctx->error_msg, sizeof(ctx->error_msg),
                  "Failed to start stunnel process.\n"
@@ -299,15 +305,20 @@ static int start_stunnel(hw_ctx_t* ctx) {
                  "Config: %s\n"
                  "Make sure stunnel is installed correctly.",
                  cmd, err, stunnel_exe, config_path);
+        return -1;
+    }
 #else
+    snprintf(cmd, sizeof(cmd), "stunnel \"%s\"", config_path);
+    ctx->stunnel_proc = launch_process("stunnel", cmd);
+    if (ctx->stunnel_proc == HW_INVALID_PROCESS) {
         snprintf(ctx->error_msg, sizeof(ctx->error_msg),
                  "Failed to start stunnel process.\n"
                  "Command: %s\n"
                  "Make sure stunnel is installed correctly.",
                  cmd);
-#endif
         return -1;
     }
+#endif
     
     HW_SLEEP(1500);
     
@@ -324,11 +335,11 @@ static int start_ssh(hw_ctx_t* ctx) {
     if (ctx->current_server < 0) return -1;
     
     hw_server_t* srv = &ctx->servers[ctx->current_server];
-    char cmd[HW_BUFFER_SIZE];
+    char args[HW_BUFFER_SIZE];
     
 #ifdef _WIN32
-    snprintf(cmd, sizeof(cmd),
-             "ssh -N -D %d -p %d -i \"%s\" "
+    snprintf(args, sizeof(args),
+             "-N -D %d -p %d -i \"%s\" "
              "-o StrictHostKeyChecking=no "
              "-o UserKnownHostsFile=NUL "
              "-o ServerAliveInterval=30 "
@@ -338,8 +349,8 @@ static int start_ssh(hw_ctx_t* ctx) {
              "%s@127.0.0.1",
              HW_SOCKS_PORT, HW_LOCAL_PORT, srv->key_path, srv->username);
 #else
-    snprintf(cmd, sizeof(cmd),
-             "ssh -N -D %d -p %d -i \"%s\" "
+    snprintf(args, sizeof(args),
+             "-N -D %d -p %d -i \"%s\" "
              "-o StrictHostKeyChecking=no "
              "-o UserKnownHostsFile=/dev/null "
              "-o ServerAliveInterval=30 "
@@ -350,7 +361,7 @@ static int start_ssh(hw_ctx_t* ctx) {
              HW_SOCKS_PORT, HW_LOCAL_PORT, srv->key_path, srv->username);
 #endif
     
-    ctx->ssh_proc = launch_process(cmd);
+    ctx->ssh_proc = launch_process("ssh", args);
     if (ctx->ssh_proc == HW_INVALID_PROCESS) {
         snprintf(ctx->error_msg, sizeof(ctx->error_msg),
                  "Failed to start SSH. Check if OpenSSH is installed.");

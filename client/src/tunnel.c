@@ -11,14 +11,20 @@ static HANDLE launch_process(const char* cmd) {
     STARTUPINFOA si = {0};
     PROCESS_INFORMATION pi = {0};
     si.cb = sizeof(si);
-    si.dwFlags = STARTF_USESHOWWINDOW;
+    si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
     si.wShowWindow = SW_HIDE;
+    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+    si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+    si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
     
     char cmdline[HW_BUFFER_SIZE];
     strncpy(cmdline, cmd, sizeof(cmdline) - 1);
+    cmdline[sizeof(cmdline) - 1] = '\0';
     
-    if (CreateProcessA(NULL, cmdline, NULL, NULL, FALSE,
-                       CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+    DWORD flags = CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP;
+    
+    if (CreateProcessA(NULL, cmdline, NULL, NULL, TRUE,
+                       flags, NULL, NULL, &si, &pi)) {
         CloseHandle(pi.hThread);
         return pi.hProcess;
     }
@@ -258,17 +264,48 @@ static int start_stunnel(hw_ctx_t* ctx) {
     
     if (found_path[0]) {
         strcpy(stunnel_path, found_path);
+    } else {
+        // If check_stunnel_installed passed but we can't find the path, this is a bug
+        snprintf(ctx->error_msg, sizeof(ctx->error_msg),
+                 "stunnel detected but path not found. Please reinstall stunnel.");
+        return -1;
     }
     
-    snprintf(cmd, sizeof(cmd), "%s \"%s\"", stunnel_path, config_path);
+    // Remove quotes from stunnel_path for CreateProcessA lpApplicationName
+    char stunnel_exe[MAX_PATH];
+    strncpy(stunnel_exe, stunnel_path, sizeof(stunnel_exe) - 1);
+    stunnel_exe[sizeof(stunnel_exe) - 1] = '\0';
+    // Remove surrounding quotes if present
+    if (stunnel_exe[0] == '"' && stunnel_exe[strlen(stunnel_exe) - 1] == '"') {
+        stunnel_exe[strlen(stunnel_exe) - 1] = '\0';
+        memmove(stunnel_exe, stunnel_exe + 1, strlen(stunnel_exe));
+    }
+    
+    // Build command line with config file
+    snprintf(cmd, sizeof(cmd), "\"%s\" \"%s\"", stunnel_exe, config_path);
 #else
     snprintf(cmd, sizeof(cmd), "stunnel \"%s\"", config_path);
 #endif
     
     ctx->stunnel_proc = launch_process(cmd);
     if (ctx->stunnel_proc == HW_INVALID_PROCESS) {
+#ifdef _WIN32
+        DWORD err = GetLastError();
         snprintf(ctx->error_msg, sizeof(ctx->error_msg),
-                 "Failed to start stunnel process");
+                 "Failed to start stunnel process.\n"
+                 "Command: %s\n"
+                 "Error code: %lu\n"
+                 "Path: %s\n"
+                 "Config: %s\n"
+                 "Make sure stunnel is installed correctly.",
+                 cmd, err, stunnel_exe, config_path);
+#else
+        snprintf(ctx->error_msg, sizeof(ctx->error_msg),
+                 "Failed to start stunnel process.\n"
+                 "Command: %s\n"
+                 "Make sure stunnel is installed correctly.",
+                 cmd);
+#endif
         return -1;
     }
     

@@ -262,9 +262,13 @@ echo ""
 echo "Port 443:"
 if ss -tlnp 2>/dev/null | grep -q ':443' || netstat -tlnp 2>/dev/null | grep -q ':443'; then
     echo "  LISTENING (ready for connections)"
+    ss -tlnp 2>/dev/null | grep ':443' || netstat -tlnp 2>/dev/null | grep ':443'
 else
     echo "  NOT LISTENING - try: sudo systemctl restart helloworld"
 fi
+echo ""
+echo "Stunnel logs (last 10 lines):"
+tail -n 10 /var/log/helloworld-stunnel.log 2>/dev/null || echo "  No logs found"
 echo ""
 echo "Public IP: $(curl -s --max-time 5 https://api.ipify.org 2>/dev/null || echo 'fetching...')"
 echo ""

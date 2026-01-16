@@ -380,36 +380,45 @@ static int start_ssh(hw_ctx_t* ctx) {
     
 #ifdef _WIN32
     snprintf(args, sizeof(args),
-             "-N -D %d -p %d -i \"%s\" "
+             "-vvv -N -D %d -p %d -i \"%s\" "
              "-o StrictHostKeyChecking=no "
              "-o UserKnownHostsFile=NUL "
              "-o ServerAliveInterval=30 "
              "-o ServerAliveCountMax=3 "
              "-o ConnectTimeout=10 "
              "-o BatchMode=yes "
+             "-o LogLevel=DEBUG3 "
              "%s@127.0.0.1",
              HW_SOCKS_PORT, HW_LOCAL_PORT, srv->key_path, srv->username);
 #else
     snprintf(args, sizeof(args),
-             "-N -D %d -p %d -i \"%s\" "
+             "-vvv -N -D %d -p %d -i \"%s\" "
              "-o StrictHostKeyChecking=no "
              "-o UserKnownHostsFile=/dev/null "
              "-o ServerAliveInterval=30 "
              "-o ServerAliveCountMax=3 "
              "-o ConnectTimeout=10 "
              "-o BatchMode=yes "
+             "-o LogLevel=DEBUG3 "
              "%s@127.0.0.1",
              HW_SOCKS_PORT, HW_LOCAL_PORT, srv->key_path, srv->username);
 #endif
     
     ctx->ssh_proc = launch_process("ssh", args);
     if (ctx->ssh_proc == HW_INVALID_PROCESS) {
+        DWORD err = GetLastError();
+        char err_msg[256] = {0};
+        FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                       NULL, err, 0, err_msg, sizeof(err_msg), NULL);
         snprintf(ctx->error_msg, sizeof(ctx->error_msg),
                  "Failed to start SSH process.\n\n"
+                 "Windows Error: %lu - %s\n\n"
+                 "SSH Command: ssh %s\n\n"
                  "Check if OpenSSH is installed:\n"
                  "1. Open PowerShell as Administrator\n"
                  "2. Run: Get-WindowsCapability -Online | Where-Object Name -like 'OpenSSH*'\n"
-                 "3. Install if needed: Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0");
+                 "3. Install if needed: Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0",
+                 err, err_msg[0] ? err_msg : "Unknown error", args);
         return -1;
     }
     
@@ -418,28 +427,59 @@ static int start_ssh(hw_ctx_t* ctx) {
     if (!is_process_running(ctx->ssh_proc)) {
         DWORD exit_code = 0;
         GetExitCodeProcess(ctx->ssh_proc, &exit_code);
+        
+        // Check if stunnel is running
+        int stunnel_running = 0;
+#ifdef _WIN32
+        HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (snapshot != INVALID_HANDLE_VALUE) {
+            PROCESSENTRY32A pe = {sizeof(pe)};
+            if (Process32FirstA(snapshot, &pe)) {
+                do {
+                    if (_stricmp(pe.szExeFile, "stunnel.exe") == 0) {
+                        stunnel_running = 1;
+                        break;
+                    }
+                } while (Process32NextA(snapshot, &pe));
+            }
+            CloseHandle(snapshot);
+        }
+#endif
+        
         snprintf(ctx->error_msg, sizeof(ctx->error_msg),
-                 "SSH connection failed (exit code: %lu)!\n\n"
-                 "SSH Command: ssh -N -D %d -p %d -i \"%s\" %s@127.0.0.1\n\n"
-                 "Possible causes:\n"
-                 "1. Wrong username:\n"
-                 "   - Oracle Cloud: 'opc'\n"
-                 "   - Google Cloud: Check your VM username (run 'whoami' on server)\n"
-                 "   - Current username: %s\n"
-                 "2. SSH key not authorized on server:\n"
+                 "SSH CONNECTION FAILED (exit code: %lu)!\n\n"
+                 "=== DIAGNOSTIC INFO ===\n"
+                 "SSH Command: ssh -N -D %d -p %d -i \"%s\" %s@127.0.0.1\n"
+                 "Stunnel running: %s\n"
+                 "Stunnel should forward: localhost:%d -> %s:%d\n\n"
+                 "=== EXIT CODE %lu MEANS ===\n"
+                 "%s\n\n"
+                 "=== TROUBLESHOOTING ===\n"
+                 "1. Test stunnel connection:\n"
+                 "   - Check if port %d is listening: netstat -an | findstr :%d\n"
+                 "   - Stunnel should forward to %s:443\n\n"
+                 "2. Test SSH key:\n"
                  "   - Key file: %s\n"
-                 "   - Make sure your PUBLIC key is in ~/.ssh/authorized_keys on server\n"
-                 "   - Test: ssh -i \"%s\" %s@%s\n"
-                 "3. Server not reachable:\n"
+                 "   - Test direct: ssh -i \"%s\" %s@%s\n"
+                 "   - If direct works, stunnel is the problem\n\n"
+                 "3. Check stunnel logs:\n"
+                 "   - Look for errors in stunnel output\n"
+                 "   - Verify stunnel config: %s\\stunnel.conf\n\n"
+                 "4. Verify server:\n"
                  "   - Server: %s:%d\n"
-                 "   - Stunnel connects to server on port 443\n"
-                 "   - Check firewall rules on cloud provider\n"
-                 "4. Stunnel not forwarding:\n"
-                 "   - Stunnel should forward localhost:2222 -> %s:443\n"
-                 "   - Check if stunnel is running",
+                 "   - Username: %s\n"
+                 "   - Key authorized: Check ~/.ssh/authorized_keys on server",
                  exit_code, HW_SOCKS_PORT, HW_LOCAL_PORT, srv->key_path, srv->username,
-                 srv->username, srv->key_path, srv->key_path, srv->username, srv->host,
-                 srv->host, srv->port, srv->host);
+                 stunnel_running ? "YES" : "NO",
+                 HW_LOCAL_PORT, srv->host, srv->port,
+                 exit_code,
+                 exit_code == 255 ? "Connection refused, authentication failed, or host key verification failed" :
+                 exit_code == 1 ? "General SSH error" :
+                 exit_code == 2 ? "SSH configuration error" :
+                 "Unknown SSH error",
+                 HW_LOCAL_PORT, HW_LOCAL_PORT, srv->host,
+                 srv->key_path, srv->key_path, srv->username, srv->host,
+                 ctx->config_dir, srv->host, srv->port, srv->username);
         return -1;
     }
     

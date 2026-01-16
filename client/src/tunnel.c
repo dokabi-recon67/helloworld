@@ -120,10 +120,17 @@ static int write_stunnel_config(hw_ctx_t* ctx) {
     
     fprintf(f, "; HelloWorld Stunnel Configuration\n");
     fprintf(f, "; Auto-generated - do not edit manually\n\n");
+#ifdef _WIN32
+    // Windows stunnel doesn't use pid = in config
+    fprintf(f, "foreground = no\n");
+    fprintf(f, "debug = 0\n");
+    fprintf(f, "output =\n");
+#else
     fprintf(f, "pid =\n");
     fprintf(f, "foreground = no\n");
     fprintf(f, "debug = 0\n");
     fprintf(f, "output =\n");
+#endif
     fprintf(f, "\n");
     fprintf(f, "[ssh]\n");
     fprintf(f, "client = yes\n");

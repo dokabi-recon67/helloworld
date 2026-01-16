@@ -453,6 +453,59 @@ static int start_stunnel(hw_ctx_t* ctx) {
         return -1;
     }
     
+    // Verify port is actually listening
+    int port_listening = 0;
+#ifdef _WIN32
+    // Check if port 2222 is listening by trying to connect
+    SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (sock != INVALID_SOCKET) {
+        struct sockaddr_in addr;
+        memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+        addr.sin_port = htons(HW_LOCAL_PORT);
+        
+        if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
+            port_listening = 1;
+        }
+        closesocket(sock);
+    }
+    
+    // If process is running but port not listening, wait a bit more
+    if (!port_listening) {
+        HW_SLEEP(2000);
+        // Check again
+        SOCKET sock2 = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (sock2 != INVALID_SOCKET) {
+            struct sockaddr_in addr2;
+            memset(&addr2, 0, sizeof(addr2));
+            addr2.sin_family = AF_INET;
+            addr2.sin_addr.s_addr = inet_addr("127.0.0.1");
+            addr2.sin_port = htons(HW_LOCAL_PORT);
+            
+            if (connect(sock2, (struct sockaddr*)&addr2, sizeof(addr2)) == 0) {
+                port_listening = 1;
+            }
+            closesocket(sock2);
+        }
+        
+        if (!port_listening && is_process_running(ctx->stunnel_proc)) {
+            // Port still not listening but process running - might be connection issue
+            snprintf(ctx->error_msg, sizeof(ctx->error_msg),
+                     "Stunnel started but port %d not listening.\n\n"
+                     "Possible causes:\n"
+                     "1. Cannot connect to server %s:%d\n"
+                     "2. Server stunnel not running\n"
+                     "3. Firewall blocking connection\n\n"
+                     "Check server: ssh into server and run 'helloworld-status'",
+                     HW_LOCAL_PORT, srv->host, srv->port);
+            kill_process(ctx->stunnel_proc);
+            ctx->stunnel_proc = HW_INVALID_PROCESS;
+            return -1;
+        }
+    }
+#endif
+    
     return 0;
 }
 

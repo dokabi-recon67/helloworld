@@ -123,14 +123,16 @@ setuid = $STUNNEL_USER
 setgid = $STUNNEL_GROUP
 
 ; Logging
-debug = 4
+debug = 0
 output = /var/log/helloworld-stunnel.log
 
-; TLS settings - secure defaults
-sslVersion = TLSv1.2
+; TLS settings - compatible with all clients
+sslVersion = all
 options = NO_SSLv2
 options = NO_SSLv3
-ciphers = HIGH:!aNULL:!MD5
+ciphers = HIGH:!aNULL:!MD5:!RC4
+verifyChain = no
+verifyPeer = no
 
 ; SSH tunnel service
 ; Accepts TLS connections on port 443

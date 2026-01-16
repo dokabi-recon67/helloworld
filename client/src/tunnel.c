@@ -460,13 +460,29 @@ static int start_stunnel(hw_ctx_t* ctx) {
             addr.sin_addr.s_addr = inet_addr("127.0.0.1");
             addr.sin_port = htons(HW_LOCAL_PORT);
             
-            // Set socket to non-blocking for quick check
+            // Use non-blocking mode with select for reliable port check
             u_long mode = 1;
             ioctlsocket(sock, FIONBIO, &mode);
             
             int result = connect(sock, (struct sockaddr*)&addr, sizeof(addr));
-            if (result == 0 || WSAGetLastError() == WSAEISCONN) {
+            if (result == 0) {
                 port_listening = 1;
+            } else {
+                int err = WSAGetLastError();
+                if (err == WSAEWOULDBLOCK || err == WSAEINPROGRESS) {
+                    // Connection in progress - check if it completes
+                    fd_set write_fds;
+                    FD_ZERO(&write_fds);
+                    FD_SET(sock, &write_fds);
+                    struct timeval tv = {0, 100000};  // 100ms timeout
+                    if (select(0, NULL, &write_fds, NULL, &tv) > 0) {
+                        // Connection completed - port is listening
+                        port_listening = 1;
+                    }
+                } else if (err == WSAEISCONN) {
+                    // Already connected
+                    port_listening = 1;
+                }
             }
             closesocket(sock);
         }

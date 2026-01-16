@@ -371,16 +371,34 @@ static int start_stunnel(hw_ctx_t* ctx) {
     if (!is_process_running(ctx->stunnel_proc)) {
         DWORD exit_code = 0;
         GetExitCodeProcess(ctx->stunnel_proc, &exit_code);
+        
+        // Try to read stunnel error output if available
+        char stunnel_error[512] = {0};
+        char log_path[HW_MAX_PATH_LEN];
+        snprintf(log_path, sizeof(log_path), "%s%sstunnel.log", ctx->config_dir, HW_PATH_SEP);
+        FILE* log_file = fopen(log_path, "r");
+        if (log_file) {
+            fseek(log_file, -256, SEEK_END);
+            fread(stunnel_error, 1, sizeof(stunnel_error) - 1, log_file);
+            fclose(log_file);
+        }
+        
+        hw_server_t* srv = &ctx->servers[ctx->current_server];
         snprintf(ctx->error_msg, sizeof(ctx->error_msg),
-                 "stunnel exited unexpectedly (exit code: %lu).\n\n"
+                 "STUNNEL FAILED (exit code: %lu)!\n\n"
+                 "Config file: %s\n"
+                 "Executable: %s\n\n"
+                 "%s\n\n"
                  "Possible causes:\n"
-                 "1. Port %d is already in use\n"
-                 "2. Config file error: %s\n"
-                 "3. Stunnel cannot connect to server\n"
-                 "4. Invalid stunnel configuration\n\n"
+                 "1. Invalid config file format\n"
+                 "2. Port %d already in use\n"
+                 "3. Cannot connect to server %s:%d\n"
+                 "4. Stunnel installation corrupted\n\n"
                  "Try running manually:\n"
                  "\"%s\" \"%s\"",
-                 exit_code, HW_LOCAL_PORT, config_path, stunnel_exe, config_path);
+                 exit_code, config_path, stunnel_exe,
+                 stunnel_error[0] ? stunnel_error : "No additional error details available.",
+                 HW_LOCAL_PORT, srv->host, srv->port, stunnel_exe, config_path);
         return -1;
     }
     

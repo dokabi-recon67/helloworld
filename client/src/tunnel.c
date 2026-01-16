@@ -5,6 +5,11 @@
 #include "helloworld.h"
 
 #ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#endif
+
+#ifdef _WIN32
 #include <shlobj.h>
 #include <tlhelp32.h>
 
@@ -393,7 +398,26 @@ static int start_stunnel(hw_ctx_t* ctx) {
     }
 #endif
     
-    HW_SLEEP(1500);
+    HW_SLEEP(2000);
+    
+    // Verify port is actually listening
+    int port_listening = 0;
+#ifdef _WIN32
+    // Check if port 2222 is listening
+    SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (sock != INVALID_SOCKET) {
+        struct sockaddr_in addr;
+        memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+        addr.sin_port = htons(HW_LOCAL_PORT);
+        
+        if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
+            port_listening = 1;
+        }
+        closesocket(sock);
+    }
+#endif
     
     if (!is_process_running(ctx->stunnel_proc)) {
         DWORD exit_code = 0;

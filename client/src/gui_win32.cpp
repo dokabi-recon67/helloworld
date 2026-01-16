@@ -386,9 +386,30 @@ static void draw_info_box(HDC hdc, RECT* rc) {
         SetTextColor(hdc, CLR_TEXT_DIM);
         SetBkMode(hdc, TRANSPARENT);
         HFONT old = (HFONT)SelectObject(hdc, g_font_small);
-        const char* hint = g_ctx && g_ctx->server_count == 0 
-            ? "No servers configured.\nClick + ADD to add your server."
-            : "Select a server and click\nCONNECT to start.";
+        const char* hint;
+        if (g_ctx && g_ctx->status == HW_CONNECTING) {
+            hint = "Connecting...\nPlease wait.";
+        } else if (g_ctx && g_ctx->status == HW_ERROR && g_ctx->error_msg[0]) {
+            // Show error message in status box
+            char error_display[256];
+            const char* err = g_ctx->error_msg;
+            if (strlen(err) > 200) {
+                strncpy(error_display, err, 200);
+                error_display[200] = '\0';
+                strcat(error_display, "...");
+            } else {
+                strncpy(error_display, err, sizeof(error_display) - 1);
+                error_display[sizeof(error_display) - 1] = '\0';
+            }
+            SetTextColor(hdc, CLR_ERROR);
+            DrawTextA(hdc, error_display, -1, &r, DT_LEFT | DT_WORDBREAK);
+            SelectObject(hdc, old);
+            return;
+        } else if (g_ctx && g_ctx->server_count == 0) {
+            hint = "No servers configured.\nClick + ADD to add your server.";
+        } else {
+            hint = "Select a server and click\nCONNECT to start.";
+        }
         DrawTextA(hdc, hint, -1, &r, DT_LEFT | DT_WORDBREAK);
         SelectObject(hdc, old);
     }

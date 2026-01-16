@@ -118,14 +118,18 @@ static int write_stunnel_config(hw_ctx_t* ctx) {
     FILE* f = fopen(config_path, "w");
     if (!f) return -1;
     
-    fprintf(f, "pid = \n");
-    fprintf(f, "client = yes\n");
-    fprintf(f, "verify = 0\n");
-    fprintf(f, "CAfile = \n");
+    fprintf(f, "; HelloWorld Stunnel Configuration\n");
+    fprintf(f, "; Auto-generated - do not edit manually\n\n");
+    fprintf(f, "pid =\n");
+    fprintf(f, "foreground = no\n");
+    fprintf(f, "debug = 0\n");
+    fprintf(f, "output =\n");
     fprintf(f, "\n");
     fprintf(f, "[ssh]\n");
+    fprintf(f, "client = yes\n");
     fprintf(f, "accept = 127.0.0.1:%d\n", HW_LOCAL_PORT);
     fprintf(f, "connect = %s:%d\n", srv->host, srv->port);
+    fprintf(f, "verify = 0\n");
     fprintf(f, "sni = %s\n", srv->host);
     
     fclose(f);

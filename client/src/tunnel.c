@@ -448,8 +448,26 @@ static int start_stunnel(hw_ctx_t* ctx) {
     int max_retries = 10;  // Total wait: 5s initial + 10*1s = 15 seconds max
     int retry_count = 0;
     
+    // First, check stunnel log to see if port is bound (faster than socket check)
+    char log_path[HW_MAX_PATH_LEN];
+    snprintf(log_path, sizeof(log_path), "%s%sstunnel.log", ctx->config_dir, HW_PATH_SEP);
+    FILE* log_file = fopen(log_path, "r");
+    if (log_file) {
+        char log_buffer[1024] = {0};
+        fseek(log_file, -512, SEEK_END);
+        fread(log_buffer, 1, sizeof(log_buffer) - 1, log_file);
+        fclose(log_file);
+        
+        // If log shows "bound to" port, stunnel has bound the port (even if server not connected yet)
+        if (strstr(log_buffer, "bound to") != NULL && strstr(log_buffer, "2222") != NULL) {
+            // Port is bound - proceed with connection attempt
+            // Stunnel will connect to server when SSH tries to connect
+            port_listening = 1;
+        }
+    }
+    
 #ifdef _WIN32
-    // Check if port 2222 is listening by trying to connect
+    // If log check didn't find it, try socket connection check
     // Use multiple retries as stunnel needs time to connect to server
     while (!port_listening && retry_count < max_retries && is_process_running(ctx->stunnel_proc)) {
         SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);

@@ -5,6 +5,7 @@
 #include "helloworld.h"
 
 #ifdef _WIN32
+#include <shlobj.h>
 
 static HANDLE launch_process(const char* cmd) {
     STARTUPINFOA si = {0};
@@ -89,7 +90,64 @@ static int write_stunnel_config(hw_ctx_t* ctx) {
     return 0;
 }
 
+static int check_stunnel_installed(void) {
+#ifdef _WIN32
+    char path[MAX_PATH];
+    DWORD result = SearchPathA(NULL, "stunnel.exe", NULL, MAX_PATH, path, NULL);
+    if (result > 0) {
+        DWORD attrs = GetFileAttributesA(path);
+        if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+            return 1;
+        }
+    }
+    
+    const char* common_paths[] = {
+        "C:\\Program Files (x86)\\stunnel\\bin\\stunnel.exe",
+        "C:\\Program Files\\stunnel\\bin\\stunnel.exe",
+        "C:\\stunnel\\bin\\stunnel.exe"
+    };
+    for (int i = 0; i < 3; i++) {
+        DWORD attrs = GetFileAttributesA(common_paths[i]);
+        if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+            return 1;
+        }
+    }
+    
+    char program_files[MAX_PATH];
+    if (SHGetSpecialFolderPathA(NULL, program_files, CSIDL_PROGRAM_FILES, FALSE)) {
+        char full_path[MAX_PATH];
+        snprintf(full_path, sizeof(full_path), "%s\\stunnel\\bin\\stunnel.exe", program_files);
+        DWORD attrs = GetFileAttributesA(full_path);
+        if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+            return 1;
+        }
+    }
+    
+    char program_files_x86[MAX_PATH];
+    if (SHGetSpecialFolderPathA(NULL, program_files_x86, CSIDL_PROGRAM_FILESX86, FALSE)) {
+        char full_path[MAX_PATH];
+        snprintf(full_path, sizeof(full_path), "%s\\stunnel\\bin\\stunnel.exe", program_files_x86);
+        DWORD attrs = GetFileAttributesA(full_path);
+        if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+            return 1;
+        }
+    }
+    
+    return 0;
+#else
+    return system("which stunnel > /dev/null 2>&1") == 0;
+#endif
+}
+
 static int start_stunnel(hw_ctx_t* ctx) {
+    if (!check_stunnel_installed()) {
+        snprintf(ctx->error_msg, sizeof(ctx->error_msg), 
+                 "stunnel not found! Please install stunnel:\n"
+                 "Download from: https://www.stunnel.org/downloads.html\n"
+                 "Or use: winget install stunnel");
+        return -1;
+    }
+    
     if (write_stunnel_config(ctx) != 0) {
         snprintf(ctx->error_msg, sizeof(ctx->error_msg), 
                  "Failed to write stunnel config");
@@ -103,7 +161,62 @@ static int start_stunnel(hw_ctx_t* ctx) {
              ctx->config_dir, HW_PATH_SEP);
     
 #ifdef _WIN32
-    snprintf(cmd, sizeof(cmd), "stunnel \"%s\"", config_path);
+    char stunnel_path[MAX_PATH] = "stunnel";
+    char found_path[MAX_PATH] = {0};
+    
+    char path[MAX_PATH];
+    DWORD result = SearchPathA(NULL, "stunnel.exe", NULL, MAX_PATH, path, NULL);
+    if (result > 0) {
+        DWORD attrs = GetFileAttributesA(path);
+        if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+            snprintf(found_path, sizeof(found_path), "\"%s\"", path);
+        }
+    }
+    
+    if (!found_path[0]) {
+        const char* common_paths[] = {
+            "C:\\Program Files (x86)\\stunnel\\bin\\stunnel.exe",
+            "C:\\Program Files\\stunnel\\bin\\stunnel.exe",
+            "C:\\stunnel\\bin\\stunnel.exe"
+        };
+        for (int i = 0; i < 3; i++) {
+            DWORD attrs = GetFileAttributesA(common_paths[i]);
+            if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+                snprintf(found_path, sizeof(found_path), "\"%s\"", common_paths[i]);
+                break;
+            }
+        }
+    }
+    
+    if (!found_path[0]) {
+        char program_files_x86[MAX_PATH];
+        if (SHGetSpecialFolderPathA(NULL, program_files_x86, CSIDL_PROGRAM_FILESX86, FALSE)) {
+            char full_path[MAX_PATH];
+            snprintf(full_path, sizeof(full_path), "%s\\stunnel\\bin\\stunnel.exe", program_files_x86);
+            DWORD attrs = GetFileAttributesA(full_path);
+            if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+                snprintf(found_path, sizeof(found_path), "\"%s\"", full_path);
+            }
+        }
+    }
+    
+    if (!found_path[0]) {
+        char program_files[MAX_PATH];
+        if (SHGetSpecialFolderPathA(NULL, program_files, CSIDL_PROGRAM_FILES, FALSE)) {
+            char full_path[MAX_PATH];
+            snprintf(full_path, sizeof(full_path), "%s\\stunnel\\bin\\stunnel.exe", program_files);
+            DWORD attrs = GetFileAttributesA(full_path);
+            if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+                snprintf(found_path, sizeof(found_path), "\"%s\"", full_path);
+            }
+        }
+    }
+    
+    if (found_path[0]) {
+        strcpy(stunnel_path, found_path);
+    }
+    
+    snprintf(cmd, sizeof(cmd), "%s \"%s\"", stunnel_path, config_path);
 #else
     snprintf(cmd, sizeof(cmd), "stunnel \"%s\"", config_path);
 #endif
@@ -111,11 +224,18 @@ static int start_stunnel(hw_ctx_t* ctx) {
     ctx->stunnel_proc = launch_process(cmd);
     if (ctx->stunnel_proc == HW_INVALID_PROCESS) {
         snprintf(ctx->error_msg, sizeof(ctx->error_msg),
-                 "Failed to start stunnel");
+                 "Failed to start stunnel process");
         return -1;
     }
     
-    HW_SLEEP(1000);
+    HW_SLEEP(1500);
+    
+    if (!is_process_running(ctx->stunnel_proc)) {
+        snprintf(ctx->error_msg, sizeof(ctx->error_msg),
+                 "stunnel exited unexpectedly.\nCheck if port %d is available.", HW_LOCAL_PORT);
+        return -1;
+    }
+    
     return 0;
 }
 
@@ -125,23 +245,50 @@ static int start_ssh(hw_ctx_t* ctx) {
     hw_server_t* srv = &ctx->servers[ctx->current_server];
     char cmd[HW_BUFFER_SIZE];
     
+#ifdef _WIN32
+    snprintf(cmd, sizeof(cmd),
+             "ssh -N -D %d -p %d -i \"%s\" "
+             "-o StrictHostKeyChecking=no "
+             "-o UserKnownHostsFile=NUL "
+             "-o ServerAliveInterval=30 "
+             "-o ServerAliveCountMax=3 "
+             "-o ConnectTimeout=10 "
+             "-o BatchMode=yes "
+             "%s@127.0.0.1",
+             HW_SOCKS_PORT, HW_LOCAL_PORT, srv->key_path, srv->username);
+#else
     snprintf(cmd, sizeof(cmd),
              "ssh -N -D %d -p %d -i \"%s\" "
              "-o StrictHostKeyChecking=no "
              "-o UserKnownHostsFile=/dev/null "
              "-o ServerAliveInterval=30 "
              "-o ServerAliveCountMax=3 "
+             "-o ConnectTimeout=10 "
+             "-o BatchMode=yes "
              "%s@127.0.0.1",
              HW_SOCKS_PORT, HW_LOCAL_PORT, srv->key_path, srv->username);
+#endif
     
     ctx->ssh_proc = launch_process(cmd);
     if (ctx->ssh_proc == HW_INVALID_PROCESS) {
         snprintf(ctx->error_msg, sizeof(ctx->error_msg),
-                 "Failed to start SSH tunnel");
+                 "Failed to start SSH. Check if OpenSSH is installed.");
         return -1;
     }
     
-    HW_SLEEP(2000);
+    HW_SLEEP(3000);
+    
+    if (!is_process_running(ctx->ssh_proc)) {
+        snprintf(ctx->error_msg, sizeof(ctx->error_msg),
+                 "SSH connection failed!\n\n"
+                 "Possible causes:\n"
+                 "- Wrong username (try: opc, ubuntu, or your user)\n"
+                 "- SSH key not authorized on server\n"
+                 "- Server not reachable on port 443\n"
+                 "- Firewall blocking connection");
+        return -1;
+    }
+    
     return 0;
 }
 

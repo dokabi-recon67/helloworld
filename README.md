@@ -22,7 +22,9 @@ HelloWorld creates a stealth tunnel between your computer and a cloud VM you con
 
 ## Quick Start
 
-See the **[Complete Setup Guide](docs/SETUP_SERVER.md)** for detailed step-by-step instructions with Oracle Cloud Free Tier.
+See the complete setup guides for detailed step-by-step instructions:
+- **[Oracle Cloud Setup Guide](docs/SETUP_SERVER.md)** - Always Free tier (4 ARM CPUs, 24GB RAM)
+- **[Google Cloud Setup Guide](docs/SETUP_SERVER_GOOGLE_CLOUD.md)** - Free tier (e2-micro instance)
 
 ### TL;DR
 
@@ -67,8 +69,8 @@ The `.gitignore` in this repo blocks sensitive files, but **always double-check 
 - 512MB RAM minimum
 
 ### Recommended Cloud Providers (Free Tier)
-- **Oracle Cloud** - 4 ARM CPUs, 24GB RAM free forever
-- Google Cloud - Small VM free for 90 days
+- **Oracle Cloud** - 4 ARM CPUs, 24GB RAM free forever ([Setup Guide](docs/SETUP_SERVER.md))
+- **Google Cloud** - e2-micro instance free tier ([Setup Guide](docs/SETUP_SERVER_GOOGLE_CLOUD.md))
 - Any VPS provider with port 443 access
 
 ---

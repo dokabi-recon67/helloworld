@@ -58,3 +58,20 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+function showProvider(provider) {
+    const oracleSteps = document.getElementById('oracle-steps');
+    const googleSteps = document.getElementById('google-steps');
+    const tabs = document.querySelectorAll('.tab-btn');
+    
+    tabs.forEach(tab => tab.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    if (provider === 'oracle') {
+        oracleSteps.style.display = 'block';
+        googleSteps.style.display = 'none';
+    } else {
+        oracleSteps.style.display = 'none';
+        googleSteps.style.display = 'block';
+    }
+}
+

@@ -501,30 +501,34 @@ static LRESULT CALLBACK add_dlg_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) 
             
             CreateWindowA("STATIC", "Server Name:", WS_CHILD | WS_VISIBLE, 20, 20, 100, 20, hwnd, NULL, NULL, NULL);
             g_add_edit_name = CreateWindowExA(WS_EX_CLIENTEDGE, "EDIT", "", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
-                20, 40, 260, 24, hwnd, NULL, NULL, NULL);
+                20, 40, 420, 24, hwnd, NULL, NULL, NULL);
             
             CreateWindowA("STATIC", "Host / IP Address:", WS_CHILD | WS_VISIBLE, 20, 75, 150, 20, hwnd, NULL, NULL, NULL);
             g_add_edit_host = CreateWindowExA(WS_EX_CLIENTEDGE, "EDIT", "", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
-                20, 95, 260, 24, hwnd, NULL, NULL, NULL);
+                20, 95, 420, 24, hwnd, NULL, NULL, NULL);
             
             CreateWindowA("STATIC", "Port:", WS_CHILD | WS_VISIBLE, 20, 130, 50, 20, hwnd, NULL, NULL, NULL);
             g_add_edit_port = CreateWindowExA(WS_EX_CLIENTEDGE, "EDIT", "443", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | ES_NUMBER,
                 70, 128, 60, 24, hwnd, NULL, NULL, NULL);
             
-            CreateWindowA("STATIC", "Username:", WS_CHILD | WS_VISIBLE, 150, 130, 70, 20, hwnd, NULL, NULL, NULL);
-            g_add_edit_user = CreateWindowExA(WS_EX_CLIENTEDGE, "EDIT", "root", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
-                220, 128, 60, 24, hwnd, NULL, NULL, NULL);
+            CreateWindowA("STATIC", "Username:", WS_CHILD | WS_VISIBLE, 20, 165, 100, 20, hwnd, NULL, NULL, NULL);
+            g_add_edit_user = CreateWindowExA(WS_EX_CLIENTEDGE, "EDIT", "", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+                20, 185, 420, 24, hwnd, NULL, NULL, NULL);
+            CreateWindowA("STATIC", "Oracle: opc | Google: your-username", WS_CHILD | WS_VISIBLE | SS_LEFT,
+                20, 212, 420, 16, hwnd, NULL, NULL, NULL);
             
-            CreateWindowA("STATIC", "SSH Key File:", WS_CHILD | WS_VISIBLE, 20, 165, 100, 20, hwnd, NULL, NULL, NULL);
+            CreateWindowA("STATIC", "SSH Private Key (file path):", WS_CHILD | WS_VISIBLE, 20, 240, 200, 20, hwnd, NULL, NULL, NULL);
             g_add_edit_key = CreateWindowExA(WS_EX_CLIENTEDGE, "EDIT", "", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
-                20, 185, 200, 24, hwnd, NULL, NULL, NULL);
+                20, 260, 340, 24, hwnd, NULL, NULL, NULL);
             CreateWindowA("BUTTON", "Browse", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-                225, 185, 55, 24, hwnd, (HMENU)106, NULL, NULL);
+                370, 260, 70, 24, hwnd, (HMENU)106, NULL, NULL);
+            CreateWindowA("STATIC", "e.g. C:\\Users\\You\\.ssh\\helloworld_key", WS_CHILD | WS_VISIBLE | SS_LEFT,
+                20, 287, 420, 16, hwnd, NULL, NULL, NULL);
             
             CreateWindowA("BUTTON", "Add Server", WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
-                70, 230, 90, 30, hwnd, (HMENU)IDOK, NULL, NULL);
+                160, 315, 90, 30, hwnd, (HMENU)IDOK, NULL, NULL);
             CreateWindowA("BUTTON", "Cancel", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-                170, 230, 60, 30, hwnd, (HMENU)IDCANCEL, NULL, NULL);
+                270, 315, 60, 30, hwnd, (HMENU)IDCANCEL, NULL, NULL);
             
             for (HWND child = GetWindow(hwnd, GW_CHILD); child; child = GetWindow(child, GW_HWNDNEXT))
                 SendMessageA(child, WM_SETFONT, (WPARAM)font, TRUE);
@@ -550,9 +554,23 @@ static LRESULT CALLBACK add_dlg_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) 
                 GetWindowTextA(g_add_edit_user, g_add_user, sizeof(g_add_user));
                 
                 if (!g_add_name[0] || !g_add_host[0]) {
-                    MessageBoxA(hwnd, "Please enter Name and Host.", "Missing Info", MB_OK);
+                    MessageBoxA(hwnd, "Please enter Name and Host.", "Missing Info", MB_OK | MB_ICONWARNING);
                     return 0;
                 }
+                if (!g_add_user[0]) {
+                    MessageBoxA(hwnd, "Please enter your username.\n\nOracle Cloud: 'opc'\nGoogle Cloud: Your Google account username\n\nTo find it: SSH into your VM and run 'whoami'", "Username Required", MB_OK | MB_ICONWARNING);
+                    return 0;
+                }
+                if (!g_add_key[0]) {
+                    MessageBoxA(hwnd, "Please select your SSH private key file.\n\nClick Browse and navigate to your .ssh folder.\nSelect the private key (NOT the .pub file).", "SSH Key Required", MB_OK | MB_ICONWARNING);
+                    return 0;
+                }
+                FILE* keytest = fopen(g_add_key, "r");
+                if (!keytest) {
+                    MessageBoxA(hwnd, "SSH key file not found!\n\nMake sure the path is correct.\nExample: C:\\Users\\You\\.ssh\\helloworld_key", "File Not Found", MB_OK | MB_ICONERROR);
+                    return 0;
+                }
+                fclose(keytest);
                 if (g_ctx) {
                     int port = atoi(g_add_port);
                     hw_add_server(g_ctx, g_add_name, g_add_host, port > 0 ? port : 443, g_add_key, g_add_user);
@@ -581,7 +599,7 @@ static void show_add_server_dialog(HWND parent) {
     RegisterClassExA(&wc);
     
     RECT prc; GetWindowRect(parent, &prc);
-    int w = 320, h = 300;
+    int w = 480, h = 380;
     g_add_dlg = CreateWindowExA(WS_EX_DLGMODALFRAME, "AddServerDlg", "Add Server",
         WS_POPUP | WS_CAPTION | WS_SYSMENU, 
         prc.left + (prc.right-prc.left-w)/2, prc.top + (prc.bottom-prc.top-h)/2,
@@ -701,12 +719,65 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             if (PtInRect(&g_rect_btn_connect, pt) && g_ctx) {
                 if (g_ctx->status == HW_CONNECTED) hw_disconnect(g_ctx);
                 else if (g_ctx->status == HW_DISCONNECTED) {
-                    if (g_ctx->server_count == 0) MessageBoxA(hwnd, "Please add a server first.", "No Server", MB_OK);
-                    else {
+                    if (g_ctx->server_count == 0) {
+                        MessageBoxA(hwnd, "Please add a server first.\n\nClick the + ADD button to add your server.", "No Server", MB_OK | MB_ICONINFORMATION);
+                    } else {
                         g_ctx->current_server = g_selected_server;
                         g_ctx->mode = g_full_tunnel ? HW_MODE_FULL_TUNNEL : HW_MODE_PROXY;
                         g_ctx->kill_switch = g_kill_switch;
-                        hw_connect(g_ctx);
+                        int result = hw_connect(g_ctx);
+                        if (result != 0) {
+                            char errmsg[1024];
+                            const char* error_detail = g_ctx->error_msg[0] ? g_ctx->error_msg : "Unknown error";
+                            
+                            if (strstr(error_detail, "stunnel not found")) {
+                                snprintf(errmsg, sizeof(errmsg), 
+                                    "STUNNEL NOT INSTALLED!\n\n"
+                                    "HelloWorld requires stunnel to work.\n\n"
+                                    "To install stunnel:\n"
+                                    "1. Open PowerShell as Administrator\n"
+                                    "2. Run: winget install stunnel\n"
+                                    "   OR download from: https://www.stunnel.org/downloads.html\n"
+                                    "3. Restart HelloWorld after installing\n\n"
+                                    "Original error: %s", error_detail);
+                            } else if (strstr(error_detail, "stunnel exited") || strstr(error_detail, "Failed to start stunnel")) {
+                                snprintf(errmsg, sizeof(errmsg), 
+                                    "STUNNEL FAILED TO START!\n\n"
+                                    "Error: %s\n\n"
+                                    "Checklist:\n"
+                                    "1. Make sure port %d is free on your PC\n"
+                                    "2. Restart HelloWorld and try again\n"
+                                    "3. Reinstall stunnel if needed\n"
+                                    "4. Run stunnel manually to see errors\n",
+                                    error_detail, HW_LOCAL_PORT);
+                            } else if (strstr(error_detail, "SSH") || strstr(error_detail, "ssh")) {
+                                snprintf(errmsg, sizeof(errmsg), 
+                                    "SSH CONNECTION FAILED!\n\n"
+                                    "Error: %s\n\n"
+                                    "Troubleshooting:\n"
+                                    "1. Verify server IP is correct\n"
+                                    "2. Check username (Oracle: 'opc', Google: 'your-username')\n"
+                                    "3. Verify SSH key file path is correct\n"
+                                    "4. Make sure key is authorized on server\n"
+                                    "5. Test connection: ssh -i \"key\" user@server-ip\n"
+                                    "6. Check server status: ssh into server and run 'helloworld-status'",
+                                    error_detail);
+                            } else {
+                                snprintf(errmsg, sizeof(errmsg), 
+                                    "CONNECTION FAILED!\n\n"
+                                    "Error: %s\n\n"
+                                    "Step-by-step checklist:\n"
+                                    "1. Server running? SSH to server and run: helloworld-status\n"
+                                    "2. Port 443 open? Check firewall rules on cloud provider\n"
+                                    "3. SSH key correct? Verify file path and permissions\n"
+                                    "4. Username correct? Oracle: 'opc', Google: check your VM user\n"
+                                    "5. Server IP correct? Get it from cloud console\n"
+                                    "6. Stunnel installed? Run: winget install stunnel\n\n"
+                                    "For detailed setup: https://github.com/dokabi-recon67/helloworld",
+                                    error_detail);
+                            }
+                            MessageBoxA(hwnd, errmsg, "Connection Failed", MB_OK | MB_ICONERROR);
+                        }
                     }
                 }
             } else if (PtInRect(&g_rect_btn_add, pt)) {
@@ -719,12 +790,13 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                 g_dropdown_open = 0;
             } else if (PtInRect(&g_rect_toggle_full, pt)) {
                 g_full_tunnel = !g_full_tunnel;
+                InvalidateRect(hwnd, NULL, FALSE);
             } else if (PtInRect(&g_rect_toggle_kill, pt)) {
                 g_kill_switch = !g_kill_switch;
+                InvalidateRect(hwnd, NULL, FALSE);
             } else {
                 g_dropdown_open = 0;
             }
-            InvalidateRect(hwnd, NULL, FALSE);
             return 0;
         }
         

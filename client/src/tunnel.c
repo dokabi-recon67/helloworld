@@ -330,10 +330,30 @@ static int start_stunnel(hw_ctx_t* ctx) {
         memmove(stunnel_exe, stunnel_exe + 1, strlen(stunnel_exe));
     }
     
-    // Build FULL command line: "stunnel.exe" "config_path"
-    // Use NULL for lpApplicationName so CreateProcessA parses the full command
-    snprintf(cmd, sizeof(cmd), "\"%s\" \"%s\"", stunnel_exe, config_path);
-    ctx->stunnel_proc = launch_process(NULL, cmd);
+    // Build command line with properly escaped path
+    // stunnel.exe expects the config file as a single argument
+    // Escape any spaces in the path
+    char escaped_path[HW_MAX_PATH_LEN * 2];
+    char* dst = escaped_path;
+    const char* src = config_path;
+    *dst++ = '"';
+    while (*src && (dst - escaped_path) < (int)sizeof(escaped_path) - 2) {
+        if (*src == '\\') {
+            *dst++ = '\\';
+            *dst++ = '\\';
+        } else if (*src == '"') {
+            *dst++ = '\\';
+            *dst++ = '"';
+        } else {
+            *dst++ = *src;
+        }
+        src++;
+    }
+    *dst++ = '"';
+    *dst = '\0';
+    
+    // Use lpApplicationName with stunnel_exe, and config_path as argument
+    ctx->stunnel_proc = launch_process(stunnel_exe, escaped_path);
     if (ctx->stunnel_proc == HW_INVALID_PROCESS) {
         DWORD err = GetLastError();
         char err_msg[256] = {0};

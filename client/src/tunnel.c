@@ -15,30 +15,40 @@ static HANDLE launch_process(const char* exe_path, const char* args) {
     si.wShowWindow = SW_HIDE;
     
     char cmdline[HW_BUFFER_SIZE];
-    if (args && args[0]) {
-        // When lpApplicationName is provided, lpCommandLine should contain
-        // the full command line including executable name OR just arguments
-        // We'll use full command line for compatibility
-        snprintf(cmdline, sizeof(cmdline), "\"%s\" %s", exe_path, args);
-    } else {
-        snprintf(cmdline, sizeof(cmdline), "\"%s\"", exe_path);
-    }
-    
     DWORD flags = CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP;
     
-    // Try with lpApplicationName first (handles spaces correctly)
-    if (CreateProcessA(exe_path, cmdline, NULL, NULL, FALSE,
-                       flags, NULL, NULL, &si, &pi)) {
-        CloseHandle(pi.hThread);
-        return pi.hProcess;
-    }
-    
-    // If that fails, try without lpApplicationName (fallback)
-    // This handles cases where lpApplicationName might cause issues
-    if (CreateProcessA(NULL, cmdline, NULL, NULL, FALSE,
-                       flags, NULL, NULL, &si, &pi)) {
-        CloseHandle(pi.hThread);
-        return pi.hProcess;
+    // When lpApplicationName is provided, lpCommandLine should be just the arguments
+    // When lpApplicationName is NULL, lpCommandLine should be the full command line
+    if (args && args[0]) {
+        // Try with lpApplicationName first (just arguments in cmdline)
+        if (CreateProcessA(exe_path, (LPSTR)args, NULL, NULL, FALSE,
+                           flags, NULL, NULL, &si, &pi)) {
+            CloseHandle(pi.hThread);
+            return pi.hProcess;
+        }
+        
+        // Fallback: full command line without lpApplicationName
+        snprintf(cmdline, sizeof(cmdline), "\"%s\" %s", exe_path, args);
+        if (CreateProcessA(NULL, cmdline, NULL, NULL, FALSE,
+                           flags, NULL, NULL, &si, &pi)) {
+            CloseHandle(pi.hThread);
+            return pi.hProcess;
+        }
+    } else {
+        // No arguments - try with lpApplicationName
+        if (CreateProcessA(exe_path, NULL, NULL, NULL, FALSE,
+                           flags, NULL, NULL, &si, &pi)) {
+            CloseHandle(pi.hThread);
+            return pi.hProcess;
+        }
+        
+        // Fallback: full command line
+        snprintf(cmdline, sizeof(cmdline), "\"%s\"", exe_path);
+        if (CreateProcessA(NULL, cmdline, NULL, NULL, FALSE,
+                           flags, NULL, NULL, &si, &pi)) {
+            CloseHandle(pi.hThread);
+            return pi.hProcess;
+        }
     }
     
     return NULL;
@@ -55,7 +65,11 @@ static void kill_process(HANDLE proc) {
 static int is_process_running(HANDLE proc) {
     if (!proc || proc == INVALID_HANDLE_VALUE) return 0;
     DWORD code;
-    return GetExitCodeProcess(proc, &code) && code == STILL_ACTIVE;
+    if (!GetExitCodeProcess(proc, &code)) {
+        // Handle is invalid, process probably exited
+        return 0;
+    }
+    return code == STILL_ACTIVE;
 }
 
 #else

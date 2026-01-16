@@ -402,7 +402,9 @@ static int start_stunnel(hw_ctx_t* ctx) {
     }
 #endif
     
-    HW_SLEEP(2000);
+    // Wait longer for stunnel to start and connect to server
+    // Stunnel needs to establish TLS connection before binding to local port
+    HW_SLEEP(5000);  // Increased from 2000 to 5000ms
     
     if (!is_process_running(ctx->stunnel_proc)) {
         DWORD exit_code = 0;
@@ -457,9 +459,10 @@ static int start_stunnel(hw_ctx_t* ctx) {
         closesocket(sock);
     }
     
-    // If process is running but port not listening, wait a bit more
+    // If process is running but port not listening, wait longer
+    // Stunnel needs time to complete TLS handshake with server
     if (!port_listening) {
-        HW_SLEEP(2000);
+        HW_SLEEP(5000);  // Increased wait time for TLS handshake
         // Check again
         SOCKET sock2 = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (sock2 != INVALID_SOCKET) {

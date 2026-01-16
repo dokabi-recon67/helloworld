@@ -403,20 +403,41 @@ static int start_ssh(hw_ctx_t* ctx) {
     ctx->ssh_proc = launch_process("ssh", args);
     if (ctx->ssh_proc == HW_INVALID_PROCESS) {
         snprintf(ctx->error_msg, sizeof(ctx->error_msg),
-                 "Failed to start SSH. Check if OpenSSH is installed.");
+                 "Failed to start SSH process.\n\n"
+                 "Check if OpenSSH is installed:\n"
+                 "1. Open PowerShell as Administrator\n"
+                 "2. Run: Get-WindowsCapability -Online | Where-Object Name -like 'OpenSSH*'\n"
+                 "3. Install if needed: Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0");
         return -1;
     }
     
     HW_SLEEP(3000);
     
     if (!is_process_running(ctx->ssh_proc)) {
+        DWORD exit_code = 0;
+        GetExitCodeProcess(ctx->ssh_proc, &exit_code);
         snprintf(ctx->error_msg, sizeof(ctx->error_msg),
-                 "SSH connection failed!\n\n"
+                 "SSH connection failed (exit code: %lu)!\n\n"
+                 "SSH Command: ssh -N -D %d -p %d -i \"%s\" %s@127.0.0.1\n\n"
                  "Possible causes:\n"
-                 "- Wrong username (try: opc, ubuntu, or your user)\n"
-                 "- SSH key not authorized on server\n"
-                 "- Server not reachable on port 443\n"
-                 "- Firewall blocking connection");
+                 "1. Wrong username:\n"
+                 "   - Oracle Cloud: 'opc'\n"
+                 "   - Google Cloud: Check your VM username (run 'whoami' on server)\n"
+                 "   - Current username: %s\n"
+                 "2. SSH key not authorized on server:\n"
+                 "   - Key file: %s\n"
+                 "   - Make sure your PUBLIC key is in ~/.ssh/authorized_keys on server\n"
+                 "   - Test: ssh -i \"%s\" %s@%s\n"
+                 "3. Server not reachable:\n"
+                 "   - Server: %s:%d\n"
+                 "   - Stunnel connects to server on port 443\n"
+                 "   - Check firewall rules on cloud provider\n"
+                 "4. Stunnel not forwarding:\n"
+                 "   - Stunnel should forward localhost:2222 -> %s:443\n"
+                 "   - Check if stunnel is running",
+                 exit_code, HW_SOCKS_PORT, HW_LOCAL_PORT, srv->key_path, srv->username,
+                 srv->username, srv->key_path, srv->key_path, srv->username, srv->host,
+                 srv->host, srv->port, srv->host);
         return -1;
     }
     

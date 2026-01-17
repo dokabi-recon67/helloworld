@@ -48,10 +48,16 @@ runcmd:
     debug = 5
     output = /var/log/stunnel.log
     
-    ; TLS settings
-    sslVersion = TLSv1.2
+    ; TLS settings - compatible with all clients
+    sslVersion = all
     options = NO_SSLv2
     options = NO_SSLv3
+    options = CIPHER_SERVER_PREFERENCE
+    ciphers = ALL:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!SRP:!CAMELLIA
+    verifyChain = no
+    verifyPeer = no
+    renegotiation = no
+    TIMEOUTclose = 0
     
     ; SSH tunnel service
     [ssh-tunnel]
@@ -102,6 +108,39 @@ runcmd:
   - firewall-cmd --permanent --add-port=443/udp
   - firewall-cmd --permanent --add-service=ssh
   - firewall-cmd --reload
+  
+  # ============================================
+  # CONFIGURE GCP FIREWALL (if on Google Cloud)
+  # ============================================
+  # Detect if running on GCP and configure firewall
+  - |
+    if curl -s -H "Metadata-Flavor: Google" --max-time 2 http://metadata.google.internal/computeMetadata/v1/instance/id >/dev/null 2>&1; then
+      echo "Detected Google Cloud Platform - configuring firewall..."
+      # Try to use gcloud if available (requires gcloud CLI installed on VM)
+      if command -v gcloud >/dev/null 2>&1; then
+        PROJECT=$(gcloud config get-value project 2>/dev/null)
+        if [ -n "$PROJECT" ]; then
+          # Check if rule exists, create if not
+          if ! gcloud compute firewall-rules list --filter="name=allow-helloworld-443" --format="value(name)" 2>/dev/null | grep -q "allow-helloworld-443"; then
+            gcloud compute firewall-rules create allow-helloworld-443 \
+              --allow tcp:443 \
+              --source-ranges 0.0.0.0/0 \
+              --description "Allow HelloWorld stunnel on port 443" \
+              --direction INGRESS 2>/dev/null || echo "GCP firewall: gcloud command failed (may need to run from PC)"
+          else
+            echo "GCP firewall rule already exists"
+          fi
+        else
+          echo "GCP firewall: gcloud not configured (will need manual setup)"
+        fi
+      else
+        echo "GCP firewall: gcloud CLI not available on VM"
+        echo "To configure GCP firewall, run this on your PC:"
+        echo "gcloud compute firewall-rules create allow-helloworld-443 --allow tcp:443 --source-ranges 0.0.0.0/0 --description 'Allow HelloWorld stunnel on port 443'"
+      fi
+    else
+      echo "Not running on GCP (or metadata service unavailable)"
+    fi
   
   # ============================================
   # CONFIGURE TOR (for anonymous exit mode)

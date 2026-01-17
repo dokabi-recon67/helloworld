@@ -130,9 +130,12 @@ output = /var/log/helloworld-stunnel.log
 sslVersion = all
 options = NO_SSLv2
 options = NO_SSLv3
-ciphers = HIGH:!aNULL:!MD5:!RC4
+options = CIPHER_SERVER_PREFERENCE
+ciphers = ALL:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!SRP:!CAMELLIA
 verifyChain = no
 verifyPeer = no
+renegotiation = no
+TIMEOUTclose = 0
 
 ; SSH tunnel service
 ; Accepts TLS connections on port 443
@@ -161,6 +164,15 @@ print_status "SSH secured (key-only authentication)"
 # Open firewall port 443
 echo ""
 echo "[7/8] Configuring firewall..."
+
+# Detect if running on Google Cloud Platform
+IS_GCP=false
+if curl -s -H "Metadata-Flavor: Google" --max-time 2 http://metadata.google.internal/computeMetadata/v1/instance/id >/dev/null 2>&1; then
+    IS_GCP=true
+    print_status "Detected: Google Cloud Platform"
+fi
+
+# Configure local firewall (UFW, Firewalld, or IPTables)
 # UFW (Ubuntu/Debian)
 if command -v ufw &> /dev/null; then
     ufw allow 443/tcp >/dev/null 2>&1 || true
@@ -182,6 +194,47 @@ if command -v iptables &> /dev/null && ! command -v ufw &> /dev/null && ! comman
     iptables -A INPUT -p tcp --dport 443 -j ACCEPT 2>/dev/null || true
     iptables -A INPUT -p udp --dport 443 -j ACCEPT 2>/dev/null || true
     print_status "IPTables: port 443 opened"
+fi
+
+# Configure Google Cloud Platform firewall (if on GCP)
+if [ "$IS_GCP" = true ]; then
+    echo ""
+    echo "  Configuring GCP firewall..."
+    
+    # Try to configure GCP firewall using gcloud (if available)
+    if command -v gcloud &> /dev/null; then
+        PROJECT=$(gcloud config get-value project 2>/dev/null)
+        if [ -n "$PROJECT" ]; then
+            # Check if rule already exists
+            if ! gcloud compute firewall-rules list --filter="name=allow-helloworld-443" --format="value(name)" 2>/dev/null | grep -q "allow-helloworld-443"; then
+                if gcloud compute firewall-rules create allow-helloworld-443 \
+                    --allow tcp:443 \
+                    --source-ranges 0.0.0.0/0 \
+                    --description "Allow HelloWorld stunnel on port 443" \
+                    --direction INGRESS \
+                    >/dev/null 2>&1; then
+                    print_status "GCP firewall: rule created (port 443)"
+                else
+                    print_warning "GCP firewall: failed to create rule automatically"
+                    echo "  You may need to create it manually in GCP Console"
+                fi
+            else
+                print_status "GCP firewall: rule already exists"
+            fi
+        else
+            print_warning "GCP firewall: gcloud not configured (no project set)"
+            echo "  Run on your PC: gcloud config set project YOUR_PROJECT_ID"
+        fi
+    else
+        print_warning "GCP firewall: gcloud CLI not installed on VM"
+        echo "  To configure GCP firewall, run this on your PC:"
+        echo "  gcloud compute firewall-rules create allow-helloworld-443 \\"
+        echo "    --allow tcp:443 --source-ranges 0.0.0.0/0 \\"
+        echo "    --description 'Allow HelloWorld stunnel on port 443'"
+        echo ""
+        echo "  Or create it in GCP Console:"
+        echo "  https://console.cloud.google.com/compute/firewalls"
+    fi
 fi
 
 # Create and start systemd service

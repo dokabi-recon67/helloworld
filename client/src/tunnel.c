@@ -21,6 +21,23 @@ static HANDLE launch_process(const char* exe_path, const char* args) {
     si.wShowWindow = SW_HIDE;
     
     char cmdline[HW_BUFFER_SIZE];
+    // For stunnel, launch via cmd.exe /c to ensure proper environment and socket binding
+    // This is a workaround for Windows stunnel binding issues
+    int is_stunnel = (strstr(exe_path, "stunnel") != NULL);
+    
+    if (is_stunnel && args && args[0]) {
+        // Launch stunnel via cmd.exe /c - this ensures proper socket binding on Windows
+        snprintf(cmdline, sizeof(cmdline), "/c \"\"%s\" %s\"", exe_path, args);
+        DWORD flags = CREATE_NEW_PROCESS_GROUP;
+        if (CreateProcessA("C:\\Windows\\System32\\cmd.exe", cmdline, NULL, NULL, FALSE,
+                           flags, NULL, NULL, &si, &pi)) {
+            CloseHandle(pi.hThread);
+            return pi.hProcess;
+        }
+        // Fallback to direct launch if cmd.exe method fails
+    }
+    
+    // For non-stunnel processes, use normal launch
     DWORD flags = CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP;
     
     // When lpApplicationName is provided, lpCommandLine should be just the arguments
@@ -128,7 +145,9 @@ static int write_stunnel_config(hw_ctx_t* ctx) {
 #ifdef _WIN32
     // Windows stunnel doesn't use pid = in config
     // foreground must be 'yes' or 'quiet' on Windows, not 'no'
-    fprintf(f, "foreground = quiet\n");
+    // On Windows, 'foreground = yes' may be needed for proper port binding
+    // 'quiet' mode might prevent proper socket binding
+    fprintf(f, "foreground = yes\n");
     fprintf(f, "debug = 7\n");
     char log_path[HW_MAX_PATH_LEN];
     snprintf(log_path, sizeof(log_path), "%s%sstunnel.log", ctx->config_dir, HW_PATH_SEP);
@@ -142,7 +161,11 @@ static int write_stunnel_config(hw_ctx_t* ctx) {
     fprintf(f, "\n");
     fprintf(f, "[ssh]\n");
     fprintf(f, "client = yes\n");
-    fprintf(f, "accept = 127.0.0.1:%d\n", HW_LOCAL_PORT);
+    // On Windows, use 0.0.0.0 instead of 127.0.0.1 - some stunnel versions have binding issues with 127.0.0.1
+    // We'll still connect from 127.0.0.1, but stunnel listens on all interfaces
+    fprintf(f, "accept = 0.0.0.0:%d\n", HW_LOCAL_PORT);
+    // Add delay to ensure port is ready
+    fprintf(f, "delay = no\n");
     fprintf(f, "connect = %s:%d\n", srv->host, srv->port);
     fprintf(f, "verify = 0\n");
     fprintf(f, "sslVersion = all\n");
@@ -529,7 +552,55 @@ static int start_stunnel(hw_ctx_t* ctx) {
         return -1;
     }
     
-    // Stunnel is running and port is bound - ready to proceed
+    // Stunnel is running and log says port is bound - verify it's actually listening
+    // CRITICAL: Just because log says "bound to" doesn't mean port is actually listening
+    // We need to test the actual port with a socket connection
+#ifdef _WIN32
+    SOCKET test_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (test_sock != INVALID_SOCKET) {
+        struct sockaddr_in test_addr;
+        memset(&test_addr, 0, sizeof(test_addr));
+        test_addr.sin_family = AF_INET;
+        test_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+        test_addr.sin_port = htons(HW_LOCAL_PORT);
+        
+        // Try to connect - if port is listening, connect will succeed or return WSAEWOULDBLOCK
+        int test_result = connect(test_sock, (struct sockaddr*)&test_addr, sizeof(test_addr));
+        int test_err = WSAGetLastError();
+        closesocket(test_sock);
+        
+        if (test_result != 0 && test_err != WSAEWOULDBLOCK && test_err != WSAEINPROGRESS) {
+            // Connection refused - port is NOT actually listening
+            snprintf(ctx->error_msg, sizeof(ctx->error_msg),
+                     "Stunnel log says port %d is bound, but port is NOT actually listening!\n\n"
+                     "This is a critical bug - stunnel is running but not bound to the port.\n\n"
+                     "Server: %s:%d\n"
+                     "Local port: %d\n"
+                     "Error: Connection refused (Windows error: %d)\n\n"
+                     "Possible causes:\n"
+                     "1. Port %d already in use by another process\n"
+                     "2. Windows Firewall blocking localhost:2222\n"
+                     "3. Stunnel failed to bind but didn't exit\n"
+                     "4. Stunnel config error preventing binding\n\n"
+                     "Troubleshooting:\n"
+                     "1. Check if port is in use: netstat -ano | findstr :2222\n"
+                     "2. Kill all stunnel processes and try again\n"
+                     "3. Check Windows Firewall rules\n"
+                     "4. Check stunnel log: %s\\stunnel.log",
+                     HW_LOCAL_PORT, srv->host, srv->port, HW_LOCAL_PORT, test_err,
+                     HW_LOCAL_PORT, ctx->config_dir);
+            kill_process(ctx->stunnel_proc);
+            ctx->stunnel_proc = HW_INVALID_PROCESS;
+            return -1;
+        }
+        // Port is actually listening - proceed
+    } else {
+        // Socket creation failed - this shouldn't happen but handle it
+        // Continue anyway as log says port is bound
+    }
+#endif
+    
+    // Stunnel is running and port is actually bound - ready to proceed
     // In client mode, stunnel will connect to server when SSH connects
     // No need to verify server connection now - that happens lazily
     
@@ -591,7 +662,45 @@ static int start_ssh(hw_ctx_t* ctx) {
     // 1. Accept SSH connection on local port 2222
     // 2. Establish TLS connection to server
     // 3. Forward SSH traffic through TLS tunnel
-    HW_SLEEP(10000);  // Increased to 10 seconds - allows time for TLS handshake
+    // But first, verify stunnel is actually listening on port 2222
+    // In client mode, stunnel should accept connections immediately when bound
+    HW_SLEEP(2000);  // Wait 2 seconds for SSH to attempt connection
+    
+    // Check if SSH process is still running (if it exited immediately, connection was refused)
+    if (!is_process_running(ctx->ssh_proc)) {
+        DWORD exit_code = 0;
+        GetExitCodeProcess(ctx->ssh_proc, &exit_code);
+        if (exit_code == 255) {
+            // SSH exited immediately with 255 - connection refused
+            // This means SSH couldn't connect to localhost:2222
+            snprintf(ctx->error_msg, sizeof(ctx->error_msg),
+                     "SSH CONNECTION REFUSED (exit code: 255)!\n\n"
+                     "SSH cannot connect to localhost:2222 where stunnel should be listening.\n\n"
+                     "=== DIAGNOSTIC INFO ===\n"
+                     "SSH Command: ssh -N -D %d -p %d -i \"%s\" %s@127.0.0.1\n"
+                     "Stunnel running: %s\n"
+                     "Stunnel config: %s\\stunnel.conf\n\n"
+                     "=== POSSIBLE CAUSES ===\n"
+                     "1. Port 2222 not actually listening (check: netstat -an | findstr :2222)\n"
+                     "2. Windows Firewall blocking localhost:2222\n"
+                     "3. Stunnel bound but not accepting connections\n"
+                     "4. Another process using port 2222\n\n"
+                     "=== TROUBLESHOOTING ===\n"
+                     "1. Check if port 2222 is listening:\n"
+                     "   netstat -an | findstr :2222\n\n"
+                     "2. Test stunnel manually:\n"
+                     "   \"C:\\Program Files (x86)\\stunnel\\bin\\stunnel.exe\" \"%s\\stunnel.conf\"\n\n"
+                     "3. Test SSH connection to stunnel:\n"
+                     "   ssh -vvv -p 2222 -i \"%s\" %s@127.0.0.1\n\n"
+                     "4. Check stunnel log: %s\\stunnel.log",
+                     HW_SOCKS_PORT, HW_LOCAL_PORT, srv->key_path, srv->username,
+                     is_process_running(ctx->stunnel_proc) ? "YES" : "NO",
+                     ctx->config_dir, ctx->config_dir, srv->key_path, srv->username, ctx->config_dir);
+            return -1;
+        }
+    }
+    
+    HW_SLEEP(8000);  // Wait additional 8 seconds for TLS handshake (total 10s)
     
     // Verify stunnel is still running (critical - it might have died)
     if (!is_process_running(ctx->stunnel_proc)) {
@@ -681,11 +790,25 @@ static int start_ssh(hw_ctx_t* ctx) {
         // Also check if stunnel log shows NO connection attempts at all
         // If stunnel is bound but never tries to connect, that's a problem
         int has_connection_attempt = 0;
+        // Check for any connection-related activity in the log
+        // In client mode, stunnel only connects when a client (SSH) connects to local port
+        // So we need to check if there's activity AFTER SSH tried to connect
         if (strstr(stunnel_log, "SSL_connect") != NULL ||
             strstr(stunnel_log, "Connecting") != NULL ||
             strstr(stunnel_log, "Connected") != NULL ||
-            strstr(stunnel_log, "Connection") != NULL) {
+            strstr(stunnel_log, "Connection") != NULL ||
+            strstr(stunnel_log, "LOG5") != NULL ||  // Info level - connection established
+            strstr(stunnel_log, "LOG6") != NULL ||  // Info level - connection info
+            strstr(stunnel_log, "LOG7") != NULL) {  // Debug level - connection details
             has_connection_attempt = 1;
+        }
+        
+        // Check if stunnel log shows it's waiting for connections but none are happening
+        // This would indicate stunnel is bound but SSH can't connect to it
+        int stunnel_waiting = 0;
+        if (strstr(stunnel_log, "Accepting new connections") != NULL ||
+            strstr(stunnel_log, "bound to") != NULL) {
+            stunnel_waiting = 1;
         }
         
         snprintf(ctx->error_msg, sizeof(ctx->error_msg),
@@ -725,10 +848,12 @@ static int start_ssh(hw_ctx_t* ctx) {
                  exit_code == 2 ? "SSH configuration error" :
                  "Unknown SSH error",
                  connection_error ? "Stunnel cannot connect to server. Check server status, IP, and firewall." :
+                 !has_connection_attempt && stunnel_waiting ? "Stunnel is bound and waiting, but SSH cannot connect to local port 2222. This suggests SSH is being refused by stunnel or there's a port conflict." :
                  !has_connection_attempt ? "Stunnel is running but NOT attempting to connect to server when SSH connects. This suggests stunnel is not forwarding properly." :
-                 exit_code == 255 ? "SSH connection refused. Stunnel may not be forwarding properly, or server SSH is not accessible." :
+                 exit_code == 255 ? "SSH connection refused. Possible causes: 1) SSH key authentication failed, 2) Stunnel not forwarding properly, 3) Server SSH not accessible." :
                  "Unknown error - check logs for details",
                  has_connection_attempt ? "Stunnel log shows connection attempts." :
+                 stunnel_waiting ? "Stunnel is bound to port 2222 and waiting, but no connection activity when SSH tries to connect. SSH may be failing before reaching stunnel." :
                  "Stunnel log shows NO connection attempts when SSH connects. Stunnel may not be forwarding properly.",
                  srv->host, srv->port,
                  srv->key_path, srv->username, srv->host,

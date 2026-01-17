@@ -66,6 +66,17 @@ This guide walks you through setting up your own private tunnel server on Google
 
 This opens ports 80 and 443 automatically.
 
+**Note:** The installer script will automatically detect if you're on Google Cloud and attempt to configure the GCP firewall. If it can't (because gcloud CLI isn't installed on the VM), you'll need to run this command **on your PC** (not the VM):
+
+```bash
+gcloud compute firewall-rules create allow-helloworld-443 \
+  --allow tcp:443 \
+  --source-ranges 0.0.0.0/0 \
+  --description "Allow HelloWorld stunnel on port 443"
+```
+
+Or create it manually in [GCP Console > Firewall Rules](https://console.cloud.google.com/compute/firewalls).
+
 ### 2.3 Advanced Options - Auto Setup (RECOMMENDED!)
 
 This automatically installs HelloWorld when your VM boots!
@@ -346,7 +357,15 @@ cat /var/log/helloworld-setup.log
 ### "Connection refused" or timeout
 - Check that VM instance is **Running**
 - Verify you're using the correct **External IP**
-- Make sure firewall allows port 443 (should be automatic with HTTPS enabled)
+- Make sure firewall allows port 443:
+  - **Local firewall (UFW/Firewalld):** Automatically configured by installer
+  - **GCP firewall:** Automatically configured if gcloud CLI is available, otherwise run on your PC:
+    ```bash
+    gcloud compute firewall-rules create allow-helloworld-443 \
+      --allow tcp:443 --source-ranges 0.0.0.0/0 \
+      --description "Allow HelloWorld stunnel on port 443"
+    ```
+  - Or check in [GCP Console > Firewall Rules](https://console.cloud.google.com/compute/firewalls)
 - Wait 5 minutes if you just created the instance
 
 ### "Permission denied" SSH error

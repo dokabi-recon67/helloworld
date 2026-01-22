@@ -1,8 +1,6 @@
-# HelloWorld - Binary Release
+# HelloWorld
 
-**Pre-compiled binaries only. No source code included.**
-
-DPI-resistant encrypted tunnel with advanced evasion techniques. Self-hosted on your own cloud VM.
+DPI-resistant encrypted tunnel that looks like regular HTTPS traffic. Self-hosted on your own cloud VM.
 
 ## What Is This
 
@@ -79,13 +77,13 @@ The `.gitignore` in this repo blocks sensitive files, but **always double-check 
 
 ## Installation
 
-### Download Binaries
+### Client
 
-**Windows**: Download `binaries/windows/helloworld.exe`
+**Windows & macOS**: Download the pre-built binary from [Releases](https://github.com/dokabi-recon67/helloworld/releases)
 
-**macOS**: Download `binaries/macos/helloworld.app` (or see `binaries/BUILD_MACOS.md` for build instructions)
+No compilation required - just download and run!
 
-**Note**: This is a binaries-only release. Source code is not included. Just download and run!
+**Note**: Source code is not included in releases. Only pre-compiled binaries are provided for security and ease of use.
 
 ---
 

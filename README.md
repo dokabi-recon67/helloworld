@@ -65,23 +65,6 @@ See the complete setup guides for detailed step-by-step instructions:
 
 ---
 
-## Security Notice
-
-### What's Safe to Share
-- This repository (no credentials stored)
-- The HelloWorld app itself
-- Your server's public IP (if you want others to connect)
-
-### NEVER Share or Commit
-- SSH private keys (`.key`, `.pem`, `id_rsa`, etc.)
-- Your `config.json` or `config.txt` files
-- Server TLS certificates with private keys
-- Anything in your `%APPDATA%\HelloWorld\` or `~/.helloworld/` folder
-
-The `.gitignore` in this repo blocks sensitive files, but **always double-check before pushing any forks**.
-
----
-
 ## Requirements
 
 ### Client

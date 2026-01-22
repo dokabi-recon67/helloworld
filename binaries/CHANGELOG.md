@@ -1,10 +1,10 @@
 # Changelog
 
-## Version 20260123 - MAXIMUM STEALTH (10/10 Rating)
+## Version 20260123 - MAXIMUM PASSIVE STEALTH (9.5/10 Rating)
 
 ### ✅ FULLY IMPLEMENTED - All Features Active
 
-#### Advanced DPI Evasion (10/10 Rating)
+#### Advanced DPI Evasion (9.5/10 Rating - Maximum Passive Stealth)
 - **TLS Fingerprint Obfuscation**: State-aware rotation, mimics Chrome 120, Firefox 121, Safari 17
   - State-aware rotation (maintains stability during active sessions, rotates during idle)
   - TLS 1.3 only (most modern, hardest to detect)

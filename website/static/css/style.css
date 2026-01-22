@@ -196,6 +196,103 @@ section h2 {
     font-size: 0.9rem;
 }
 
+.version-info {
+    color: var(--accent-dim);
+    font-size: 0.85rem;
+    margin-bottom: 16px !important;
+    font-weight: 600;
+}
+
+/* Stealth Section */
+.stealth {
+    background: linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+}
+
+.stealth-content {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.stealth-intro {
+    text-align: center;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    margin-bottom: 40px;
+    padding: 24px;
+    background: var(--bg-card);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+}
+
+.stealth-intro strong {
+    color: var(--accent);
+    font-size: 1.2rem;
+}
+
+.stealth-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+    margin-bottom: 32px;
+}
+
+.stealth-card {
+    background: var(--bg-card);
+    padding: 28px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    transition: all 0.3s;
+}
+
+.stealth-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-4px);
+}
+
+.stealth-card h3 {
+    color: var(--accent);
+    margin-bottom: 12px;
+    font-size: 1.2rem;
+}
+
+.stealth-card p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin-bottom: 16px;
+}
+
+.stealth-impact {
+    display: inline-block;
+    background: linear-gradient(135deg, rgba(0, 255, 136, 0.15), rgba(0, 204, 255, 0.15));
+    color: var(--accent);
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border: 1px solid var(--accent);
+}
+
+.stealth-note {
+    background: var(--bg-card);
+    padding: 24px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    margin-top: 32px;
+}
+
+.stealth-note p {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.7;
+    margin: 0;
+}
+
+.stealth-note strong {
+    color: var(--text-primary);
+}
+
 /* Guide Banner */
 .guide-banner {
     max-width: 800px;

@@ -6,9 +6,14 @@
 #ifndef SECURITY_H
 #define SECURITY_H
 
-#include "helloworld.h"
 #include <stdint.h>
 #include <stdbool.h>
+#include <time.h>
+#include <stddef.h>
+
+// Forward declarations - will include helloworld.h after types are defined
+struct hw_ctx;
+typedef struct hw_ctx hw_ctx_t;
 
 // ============================================================================
 // THREAT MODEL DEFINITIONS
@@ -317,10 +322,10 @@ bool hw_state_machine_is_valid_transition(connection_state_t from, connection_st
 // INTEGRATION FUNCTIONS
 // ============================================================================
 
-int hw_security_init(hw_ctx_t* ctx, threat_model_t threats);
-void hw_security_cleanup(hw_ctx_t* ctx);
-int hw_security_process_outgoing(hw_ctx_t* ctx, uint8_t* data, size_t* len, size_t max_len);
-int hw_security_process_incoming(hw_ctx_t* ctx, uint8_t* data, size_t* len, size_t max_len);
+int hw_security_init(struct hw_ctx* ctx, threat_model_t threats);
+void hw_security_cleanup(struct hw_ctx* ctx);
+int hw_security_process_outgoing(struct hw_ctx* ctx, uint8_t* data, size_t* len, size_t max_len);
+int hw_security_process_incoming(struct hw_ctx* ctx, uint8_t* data, size_t* len, size_t max_len);
 
 #endif // SECURITY_H
 

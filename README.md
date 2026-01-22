@@ -10,16 +10,39 @@ HelloWorld creates a stealth tunnel between your computer and a cloud VM you con
 
 ## Features
 
-- **Maximum Passive Stealth** (9.5/10 rating)
+### Security & Reliability (All Threat Models)
+- **Comprehensive Threat Model Hardening**
+  - On-path attacker (read traffic): Strong encryption, AEAD, key rotation
+  - On-path attacker (tamper/insert): Integrity protection, replay protection, ordering
+  - Server compromise: Key rotation, secrets hygiene, session keys
+  - DoS/resource exhaustion: Resource caps, backpressure, timeouts
+- **Backpressure System**: Bounded queues prevent RAM exhaustion
+- **Exponential Backoff Reconnect**: Prevents network meltdown on outages
+- **Comprehensive Timeouts**: Handshake (10s), read idle (30s), write stall (5s), DNS (5s)
+- **Clean Shutdown**: Drain → flush → close prevents data corruption
+- **Frame Format**: Strict validation, max 1MB frames, fail-safe parsing
+- **Explicit State Machine**: INIT → HELLO → AUTH → READY → DRAIN → CLOSED
+- **AEAD Encryption**: ChaCha20-Poly1305 or AES-GCM for data channel
+- **Replay Protection**: Sequence numbers with sliding window (64 packets)
+- **Key Handling**: Session keys, rotation, separation (client→server, server→client, control)
+- **Nonce Discipline**: Counter-based or random, never reuse with same key
+- **Resource Caps**: Max 5 connections/IP, 10 unauthenticated handshakes, 16 streams/session, 1MB buffer
+
+### DPI Evasion (9.5/10 Stealth Rating)
+- **Maximum Passive Stealth**
   - Appears indistinguishable from baseline web traffic under tested conditions
   - Below confidence threshold for most DPI systems
   - Non-actionable classification (looks like standard HTTPS)
+- **TLS Fingerprinting**: State-aware rotation, mimics Chrome/Firefox/Safari
+- **Traffic Shaping**: HTTP-like patterns, variable packet sizes, realistic delays
+- **ML Classification Evasion**: Pattern breaking, entropy variations
+- **DNS Leak Prevention**: 100% - all DNS through tunnel (SOCKS5)
+
+### Core Features
 - TLS wrapper on port 443 (looks like HTTPS)
 - SSH transport (battle-tested encryption)
 - Full tunnel mode (all traffic through VM)
 - Proxy mode (SOCKS5 for specific apps)
-- Advanced DPI evasion (TLS fingerprinting, traffic shaping, ML evasion)
-- DNS leak prevention (100% - all DNS through tunnel)
 - Cross-platform (Windows, macOS)
 - Pre-compiled binaries (no compilation needed)
 

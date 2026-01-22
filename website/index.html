@@ -34,18 +34,77 @@
                 </div>
                 <div class="feature">
                     <div class="feature-icon">2</div>
+                    <h3>Comprehensive Security</h3>
+                    <p>All threat models hardened: on-path attacks, server compromise, DoS resistance. AEAD encryption, replay protection, key rotation.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">3</div>
+                    <h3>Reliability Features</h3>
+                    <p>Backpressure system, exponential backoff reconnect, comprehensive timeouts, clean shutdown. Production-ready reliability.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">4</div>
                     <h3>TLS Wrapper</h3>
                     <p>All traffic wrapped in TLS on port 443. Non-actionable classification (looks like standard HTTPS).</p>
                 </div>
                 <div class="feature">
-                    <div class="feature-icon">3</div>
+                    <div class="feature-icon">5</div>
                     <h3>SSH Transport</h3>
                     <p>Battle-tested SSH encryption inside. No custom crypto. No vulnerabilities.</p>
                 </div>
                 <div class="feature">
-                    <div class="feature-icon">4</div>
+                    <div class="feature-icon">6</div>
                     <h3>Full Tunnel</h3>
                     <p>Route all system traffic through your server. Your IP becomes the VM's IP.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="security" id="security">
+            <h2>Comprehensive Security & Reliability</h2>
+            <div class="security-content">
+                <p class="security-intro">HelloWorld implements <strong>comprehensive threat model hardening</strong> targeting all major attack vectors, not just one.</p>
+                
+                <div class="security-grid">
+                    <div class="security-card">
+                        <h3>On-Path Attacker (Read)</h3>
+                        <p>Strong encryption, AEAD, key rotation, nonce discipline. Multiple layers of encryption protect against traffic analysis.</p>
+                        <span class="security-status">✅ Hardened</span>
+                    </div>
+                    <div class="security-card">
+                        <h3>On-Path Attacker (Tamper)</h3>
+                        <p>Integrity protection, replay protection, ordering, frame validation. Any tampering is detected and rejected.</p>
+                        <span class="security-status">✅ Hardened</span>
+                    </div>
+                    <div class="security-card">
+                        <h3>Server Compromise</h3>
+                        <p>Key rotation, secrets hygiene, session keys, key derivation. Even if server is compromised, session keys are ephemeral.</p>
+                        <span class="security-status">✅ Hardened</span>
+                    </div>
+                    <div class="security-card">
+                        <h3>DoS / Resource Exhaustion</h3>
+                        <p>Resource caps, backpressure, timeouts, connection limits. Server resources are protected from exhaustion attacks.</p>
+                        <span class="security-status">✅ Hardened</span>
+                    </div>
+                </div>
+                
+                <div class="reliability-grid">
+                    <div class="reliability-card">
+                        <h3>Backpressure System</h3>
+                        <p>Bounded queues (64KB per stream) prevent RAM exhaustion. When full, stop reading until drained.</p>
+                    </div>
+                    <div class="reliability-card">
+                        <h3>Exponential Backoff</h3>
+                        <p>250ms → 500ms → 1s → 2s → ... (cap at 30s) with ±20% jitter. Prevents network meltdown on outages.</p>
+                    </div>
+                    <div class="reliability-card">
+                        <h3>Comprehensive Timeouts</h3>
+                        <p>Handshake (10s), read idle (30s), write stall (5s), DNS (5s). Dead connections are detected quickly.</p>
+                    </div>
+                    <div class="reliability-card">
+                        <h3>Clean Shutdown</h3>
+                        <p>Drain → flush → close prevents data corruption. System state is always consistent.</p>
+                    </div>
                 </div>
             </div>
         </section>

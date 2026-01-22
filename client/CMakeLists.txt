@@ -12,6 +12,7 @@ set(SOURCES
     src/config.c
     src/stealth.c
     src/stealth_active.c
+    src/security.c
 )
 
 if(WIN32)

@@ -95,6 +95,29 @@ static int is_process_running(HANDLE proc) {
     return code == STILL_ACTIVE;
 }
 
+// Find stunnel process by name (since we launch via cmd.exe, we need to find the actual stunnel.exe)
+static HANDLE find_stunnel_process(void) {
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snapshot == INVALID_HANDLE_VALUE) return NULL;
+    
+    PROCESSENTRY32 pe;
+    pe.dwSize = sizeof(PROCESSENTRY32);
+    HANDLE stunnel_handle = NULL;
+    
+    if (Process32First(snapshot, &pe)) {
+        do {
+            if (_stricmp(pe.szExeFile, "stunnel.exe") == 0) {
+                // Found stunnel.exe - open handle to it
+                stunnel_handle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_TERMINATE, FALSE, pe.th32ProcessID);
+                break;
+            }
+        } while (Process32Next(snapshot, &pe));
+    }
+    
+    CloseHandle(snapshot);
+    return stunnel_handle;
+}
+
 #else
 
 static pid_t launch_process(const char* exe_path, const char* args) {
@@ -137,6 +160,12 @@ static int write_stunnel_config(hw_ctx_t* ctx) {
     snprintf(config_path, sizeof(config_path), "%s%sstunnel.conf", 
              ctx->config_dir, HW_PATH_SEP);
     
+    // Use stealth configuration for browser-like TLS fingerprint
+    if (hw_generate_stealth_stunnel_config(ctx, config_path) == 0) {
+        return 0;  // Stealth config generated successfully
+    }
+    
+    // Fallback to standard config if stealth fails
     FILE* f = fopen(config_path, "w");
     if (!f) return -1;
     
@@ -171,10 +200,10 @@ static int write_stunnel_config(hw_ctx_t* ctx) {
     fprintf(f, "sslVersion = all\n");
     fprintf(f, "options = NO_SSLv2\n");
     fprintf(f, "options = NO_SSLv3\n");
-    fprintf(f, "TIMEOUTclose = 0\n");
+    fprintf(f, "TIMEOUTclose = 0\n");  // 0 = never timeout, keep connection open indefinitely
+    // TIMEOUTclose = 0 prevents premature closure when SSH hasn't sent data yet
     // Minimal config - verify=0 is enough for self-signed certs
     // sslVersion = all ensures compatibility with server
-    // TIMEOUTclose = 0 prevents connection delays
     // Extra options (verifyChain, verifyPeer, sslVersion) can cause issues on Windows
     
     fclose(f);
@@ -435,7 +464,20 @@ static int start_stunnel(hw_ctx_t* ctx) {
     // In client mode, stunnel binds to local port immediately
     // It does NOT pre-connect to server - connection happens when SSH connects
     // So we just need to verify stunnel is running and has bound the port
-    HW_SLEEP(3000);  // Wait 3 seconds for stunnel to fully initialize
+    HW_SLEEP(3000);  // Wait 3 seconds for cmd.exe to finish launching stunnel
+    
+    // CRITICAL FIX: When launching via cmd.exe /c, we get cmd.exe's handle, not stunnel's
+    // cmd.exe exits immediately after launching stunnel, so we need to find the actual stunnel process
+    HANDLE actual_stunnel = find_stunnel_process();
+    if (actual_stunnel) {
+        // Close the cmd.exe handle and use the actual stunnel handle
+        if (ctx->stunnel_proc != HW_INVALID_PROCESS) {
+            CloseHandle(ctx->stunnel_proc);
+        }
+        ctx->stunnel_proc = actual_stunnel;
+    }
+    
+    HW_SLEEP(2000);  // Wait 2 more seconds for stunnel to fully initialize
     
     hw_server_t* srv = &ctx->servers[ctx->current_server];
     
@@ -471,37 +513,60 @@ static int start_stunnel(hw_ctx_t* ctx) {
         return -1;
     }
     
-    // Check stunnel log to verify port is bound
-    // In client mode, stunnel binds immediately - if it's running and log shows "bound to",
-    // we can proceed. Stunnel will connect to server when SSH connects.
-    char log_path[HW_MAX_PATH_LEN];
+    // Check if port 2222 is actually listening (faster than waiting for log)
+    // Stunnel should bind immediately, so check socket directly first
     int port_bound = 0;
-    int max_wait_retries = 30;  // Wait up to 30 seconds total (30 * 1s)
-    int wait_count = 0;
+    char log_path[HW_MAX_PATH_LEN];
+    snprintf(log_path, sizeof(log_path), "%s%sstunnel.log", ctx->config_dir, HW_PATH_SEP);
     
-    while (!port_bound && wait_count < max_wait_retries && is_process_running(ctx->stunnel_proc)) {
-        snprintf(log_path, sizeof(log_path), "%s%sstunnel.log", ctx->config_dir, HW_PATH_SEP);
-        FILE* log_file = fopen(log_path, "r");
-        if (log_file) {
-            char log_buffer[2048] = {0};
-            fseek(log_file, -1024, SEEK_END);  // Read more of the log
-            fread(log_buffer, 1, sizeof(log_buffer) - 1, log_file);
-            fclose(log_file);
-            
-            // Check if stunnel bound to port 2222
-            if (strstr(log_buffer, "bound to") != NULL && strstr(log_buffer, "2222") != NULL) {
-                // Also verify it says "Accepting new connections" or similar
-                if (strstr(log_buffer, "Accepting") != NULL || strstr(log_buffer, "LISTENING") != NULL) {
-                    port_bound = 1;
-                    break;
+    // First, try socket check immediately (fastest method)
+#ifdef _WIN32
+    SOCKET test_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (test_sock != INVALID_SOCKET) {
+        struct sockaddr_in test_addr;
+        memset(&test_addr, 0, sizeof(test_addr));
+        test_addr.sin_family = AF_INET;
+        test_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+        test_addr.sin_port = htons(HW_LOCAL_PORT);
+        
+        // Try to connect - if port is listening, connect will succeed or return WSAEWOULDBLOCK
+        int test_result = connect(test_sock, (struct sockaddr*)&test_addr, sizeof(test_addr));
+        int test_err = WSAGetLastError();
+        closesocket(test_sock);
+        
+        if (test_result == 0 || test_err == WSAEWOULDBLOCK || test_err == WSAEINPROGRESS) {
+            port_bound = 1;  // Port is listening!
+        }
+    }
+#endif
+    
+    // If socket check didn't work, check log (but only wait 5 seconds max)
+    if (!port_bound) {
+        int max_wait_retries = 5;  // Only wait 5 seconds max (5 * 1s)
+        int wait_count = 0;
+        
+        while (!port_bound && wait_count < max_wait_retries && is_process_running(ctx->stunnel_proc)) {
+            FILE* log_file = fopen(log_path, "r");
+            if (log_file) {
+                char log_buffer[2048] = {0};
+                fseek(log_file, -1024, SEEK_END);
+                fread(log_buffer, 1, sizeof(log_buffer) - 1, log_file);
+                fclose(log_file);
+                
+                // Check if stunnel bound to port 2222
+                if (strstr(log_buffer, "bound to") != NULL && strstr(log_buffer, "2222") != NULL) {
+                    if (strstr(log_buffer, "Accepting") != NULL || strstr(log_buffer, "LISTENING") != NULL) {
+                        port_bound = 1;
+                        break;
+                    }
                 }
             }
-        }
-        
-        if (!port_bound) {
-            wait_count++;
-            if (wait_count < max_wait_retries) {
-                HW_SLEEP(1000);  // Wait 1 second and check again
+            
+            if (!port_bound) {
+                wait_count++;
+                if (wait_count < max_wait_retries) {
+                    HW_SLEEP(1000);  // Wait 1 second and check again
+                }
             }
         }
     }
@@ -531,6 +596,7 @@ static int start_stunnel(hw_ctx_t* ctx) {
             fclose(log_file);
         }
         
+        int wait_count_used = 5;  // Default if we don't know
         snprintf(ctx->error_msg, sizeof(ctx->error_msg),
                  "Stunnel running but port %d not bound after %d seconds.\n\n"
                  "Stunnel process is running but hasn't bound to local port.\n"
@@ -543,7 +609,7 @@ static int start_stunnel(hw_ctx_t* ctx) {
                  "2. Port %d already in use by another process\n"
                  "3. Stunnel installation issue\n\n"
                  "Check stunnel log: %s",
-                 HW_LOCAL_PORT, wait_count,
+                 HW_LOCAL_PORT, wait_count_used,
                  srv->host, srv->port, HW_LOCAL_PORT,
                  stunnel_log[0] ? stunnel_log : "No stunnel log entries found.",
                  HW_LOCAL_PORT, log_path);
@@ -552,53 +618,8 @@ static int start_stunnel(hw_ctx_t* ctx) {
         return -1;
     }
     
-    // Stunnel is running and log says port is bound - verify it's actually listening
-    // CRITICAL: Just because log says "bound to" doesn't mean port is actually listening
-    // We need to test the actual port with a socket connection
-#ifdef _WIN32
-    SOCKET test_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (test_sock != INVALID_SOCKET) {
-        struct sockaddr_in test_addr;
-        memset(&test_addr, 0, sizeof(test_addr));
-        test_addr.sin_family = AF_INET;
-        test_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-        test_addr.sin_port = htons(HW_LOCAL_PORT);
-        
-        // Try to connect - if port is listening, connect will succeed or return WSAEWOULDBLOCK
-        int test_result = connect(test_sock, (struct sockaddr*)&test_addr, sizeof(test_addr));
-        int test_err = WSAGetLastError();
-        closesocket(test_sock);
-        
-        if (test_result != 0 && test_err != WSAEWOULDBLOCK && test_err != WSAEINPROGRESS) {
-            // Connection refused - port is NOT actually listening
-            snprintf(ctx->error_msg, sizeof(ctx->error_msg),
-                     "Stunnel log says port %d is bound, but port is NOT actually listening!\n\n"
-                     "This is a critical bug - stunnel is running but not bound to the port.\n\n"
-                     "Server: %s:%d\n"
-                     "Local port: %d\n"
-                     "Error: Connection refused (Windows error: %d)\n\n"
-                     "Possible causes:\n"
-                     "1. Port %d already in use by another process\n"
-                     "2. Windows Firewall blocking localhost:2222\n"
-                     "3. Stunnel failed to bind but didn't exit\n"
-                     "4. Stunnel config error preventing binding\n\n"
-                     "Troubleshooting:\n"
-                     "1. Check if port is in use: netstat -ano | findstr :2222\n"
-                     "2. Kill all stunnel processes and try again\n"
-                     "3. Check Windows Firewall rules\n"
-                     "4. Check stunnel log: %s\\stunnel.log",
-                     HW_LOCAL_PORT, srv->host, srv->port, HW_LOCAL_PORT, test_err,
-                     HW_LOCAL_PORT, ctx->config_dir);
-            kill_process(ctx->stunnel_proc);
-            ctx->stunnel_proc = HW_INVALID_PROCESS;
-            return -1;
-        }
-        // Port is actually listening - proceed
-    } else {
-        // Socket creation failed - this shouldn't happen but handle it
-        // Continue anyway as log says port is bound
-    }
-#endif
+    // Port binding already verified above (socket check first, then log check)
+    // No need to check again - proceed
     
     // Stunnel is running and port is actually bound - ready to proceed
     // In client mode, stunnel will connect to server when SSH connects
@@ -620,7 +641,7 @@ static int start_ssh(hw_ctx_t* ctx) {
              "-o UserKnownHostsFile=NUL "
              "-o ServerAliveInterval=30 "
              "-o ServerAliveCountMax=3 "
-             "-o ConnectTimeout=10 "
+             "-o ConnectTimeout=30 "
              "-o BatchMode=yes "
              "-o LogLevel=DEBUG3 "
              "%s@127.0.0.1",
@@ -632,7 +653,7 @@ static int start_ssh(hw_ctx_t* ctx) {
              "-o UserKnownHostsFile=/dev/null "
              "-o ServerAliveInterval=30 "
              "-o ServerAliveCountMax=3 "
-             "-o ConnectTimeout=10 "
+             "-o ConnectTimeout=30 "
              "-o BatchMode=yes "
              "-o LogLevel=DEBUG3 "
              "%s@127.0.0.1",
@@ -657,14 +678,14 @@ static int start_ssh(hw_ctx_t* ctx) {
         return -1;
     }
     
-    // Wait longer for SSH to establish connection through stunnel
-    // Stunnel needs time to:
-    // 1. Accept SSH connection on local port 2222
-    // 2. Establish TLS connection to server
-    // 3. Forward SSH traffic through TLS tunnel
-    // But first, verify stunnel is actually listening on port 2222
-    // In client mode, stunnel should accept connections immediately when bound
-    HW_SLEEP(2000);  // Wait 2 seconds for SSH to attempt connection
+    // SSH connects immediately - stunnel is already listening on port 2222
+    // In client mode, stunnel accepts connections lazily and connects to server on-demand
+    // No need to wait - SSH will connect and stunnel will handle the TLS tunnel
+    // The connection happens in this order:
+    // 1. SSH connects to localhost:2222 (stunnel is listening)
+    // 2. Stunnel accepts SSH connection and establishes TLS to server
+    // 3. SSH traffic flows through TLS tunnel
+    // No delay needed - stunnel is ready
     
     // Check if SSH process is still running (if it exited immediately, connection was refused)
     if (!is_process_running(ctx->ssh_proc)) {
@@ -700,7 +721,29 @@ static int start_ssh(hw_ctx_t* ctx) {
         }
     }
     
-    HW_SLEEP(8000);  // Wait additional 8 seconds for TLS handshake (total 10s)
+    // Wait for SSH connection with periodic checks (non-blocking approach)
+    // Check every 2 seconds instead of one long 20-second wait
+    int ssh_wait_retries = 15;  // 15 * 2s = 30 seconds total
+    int ssh_wait_count = 0;
+    int ssh_connected = 0;
+    
+    while (ssh_wait_count < ssh_wait_retries && !ssh_connected) {
+        HW_SLEEP(2000);  // Wait 2 seconds between checks
+        ssh_wait_count++;
+        
+        // Check if SSH is still running (if it exited, connection failed)
+        if (!is_process_running(ctx->ssh_proc)) {
+            // SSH exited - will be handled below
+            break;
+        }
+        
+        // SSH is still running - connection likely established
+        // Verify stunnel is also still running
+        if (is_process_running(ctx->stunnel_proc)) {
+            ssh_connected = 1;  // Both processes running = success
+            break;
+        }
+    }
     
     // Verify stunnel is still running (critical - it might have died)
     if (!is_process_running(ctx->stunnel_proc)) {
@@ -721,6 +764,7 @@ static int start_ssh(hw_ctx_t* ctx) {
         return -1;
     }
     
+    // SSH connection failed - check why
     if (!is_process_running(ctx->ssh_proc)) {
         DWORD exit_code = 0;
         GetExitCodeProcess(ctx->ssh_proc, &exit_code);
@@ -898,7 +942,15 @@ int hw_connect(hw_ctx_t* ctx) {
     ctx->stats.bytes_down = 0;
     ctx->status = HW_CONNECTED;
     
+    // Initialize stealth features
+    hw_init_architecture_variability();
+    hw_prevent_dns_leak(ctx);
+    hw_minimize_metadata(ctx);
+    
     hw_fetch_public_ip(ctx);
+    hw_fetch_server_time(ctx);
+    hw_fetch_dns_info(ctx);
+    
     hw_log("INFO", "Connected - Public IP: %s", ctx->stats.public_ip);
     
     return 0;
@@ -916,11 +968,44 @@ int hw_disconnect(hw_ctx_t* ctx) {
         hw_clear_system_proxy(ctx);
     }
     
+    // Restore DNS settings
+    hw_restore_dns(ctx);
+    
+    // Kill SSH first, then stunnel
     kill_process(ctx->ssh_proc);
     ctx->ssh_proc = HW_INVALID_PROCESS;
     
+    // Wait a bit for SSH to fully terminate before killing stunnel
+    HW_SLEEP(500);
+    
     kill_process(ctx->stunnel_proc);
     ctx->stunnel_proc = HW_INVALID_PROCESS;
+    
+    // Wait for processes to fully terminate before allowing reconnect
+    HW_SLEEP(1000);
+    
+    // Clean up any leftover processes (Windows sometimes leaves zombie processes)
+#ifdef _WIN32
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snapshot != INVALID_HANDLE_VALUE) {
+        PROCESSENTRY32 pe;
+        pe.dwSize = sizeof(PROCESSENTRY32);
+        if (Process32First(snapshot, &pe)) {
+            do {
+                if (_stricmp(pe.szExeFile, "stunnel.exe") == 0 || 
+                    _stricmp(pe.szExeFile, "ssh.exe") == 0) {
+                    HANDLE proc = OpenProcess(PROCESS_TERMINATE, FALSE, pe.th32ProcessID);
+                    if (proc) {
+                        TerminateProcess(proc, 0);
+                        CloseHandle(proc);
+                    }
+                }
+            } while (Process32Next(snapshot, &pe));
+        }
+        CloseHandle(snapshot);
+    }
+    HW_SLEEP(500);  // Final wait for cleanup
+#endif
     
     ctx->status = HW_DISCONNECTED;
     memset(ctx->stats.public_ip, 0, sizeof(ctx->stats.public_ip));

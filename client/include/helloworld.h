@@ -78,6 +78,9 @@ typedef struct {
     time_t start_time;
     double latency;
     char public_ip[64];
+    char server_time[64];      // Server timezone time
+    char dns_server[128];       // DNS server being used
+    char user_agent[256];       // Selected user agent
 } hw_stats_t;
 
 typedef struct {
@@ -113,12 +116,41 @@ int hw_load_config(hw_ctx_t* ctx);
 int hw_save_config(hw_ctx_t* ctx);
 
 int hw_fetch_public_ip(hw_ctx_t* ctx);
+int hw_fetch_server_time(hw_ctx_t* ctx);
+int hw_fetch_dns_info(hw_ctx_t* ctx);
 double hw_ping(const char* host);
 
 int hw_setup_system_proxy(hw_ctx_t* ctx);
 int hw_clear_system_proxy(hw_ctx_t* ctx);
 int hw_setup_full_tunnel(hw_ctx_t* ctx);
 int hw_clear_full_tunnel(hw_ctx_t* ctx);
+
+// Stealth & DPI Evasion Functions
+int hw_generate_stealth_stunnel_config(hw_ctx_t* ctx, const char* config_path);
+void hw_add_random_padding(char* data, size_t* len, size_t max_len);
+void hw_shape_traffic_delay(void);
+size_t hw_shape_packet_size(size_t original_size);
+int hw_prevent_dns_leak(hw_ctx_t* ctx);
+int hw_restore_dns(hw_ctx_t* ctx);
+void hw_normalize_timing(double* delay_ms);
+void hw_apply_asymmetry(char* data, size_t len, int is_send);
+void hw_balance_entropy(char* data, size_t len);
+void hw_minimize_metadata(hw_ctx_t* ctx);
+void hw_init_architecture_variability(void);
+void hw_apply_variability(int* delay_ms, size_t* packet_size);
+size_t hw_avoid_boundary_alignment(size_t size);
+void hw_model_user_behavior(time_t* next_activity);
+void hw_decouple_transport(size_t data_size);
+
+// Advanced DPI Evasion Functions
+void hw_generate_dummy_traffic(hw_ctx_t* ctx);
+void hw_apply_sni_cloaking(char* sni_buffer, size_t sni_size);
+void hw_randomize_connection_timing(time_t* next_connect);
+void hw_mix_traffic_patterns(size_t* packet_size, int* delay_ms);
+void hw_apply_time_obfuscation(int* activity_level);
+void hw_evade_ml_classification(char* data, size_t* len);
+void hw_randomize_headers(char* header_buffer, size_t header_size);
+void hw_mask_application_fingerprint(hw_ctx_t* ctx);
 
 const char* hw_status_str(hw_status_t status);
 void hw_log(const char* level, const char* fmt, ...);

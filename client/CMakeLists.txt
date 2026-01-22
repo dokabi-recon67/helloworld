@@ -10,6 +10,7 @@ set(SOURCES
     src/tunnel.c
     src/network.c
     src/config.c
+    src/stealth.c
 )
 
 if(WIN32)
@@ -21,6 +22,7 @@ if(WIN32)
     add_executable(helloworld WIN32 ${SOURCES})
     target_link_libraries(helloworld ws2_32 wininet shell32 comctl32 gdiplus)
     target_compile_definitions(helloworld PRIVATE _CRT_SECURE_NO_WARNINGS)
+    # Math library not needed on Windows (included in MSVC runtime)
 elseif(APPLE)
     list(APPEND SOURCES src/gui_macos.m)
     add_executable(helloworld MACOSX_BUNDLE ${SOURCES})

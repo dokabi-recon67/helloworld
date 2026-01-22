@@ -56,6 +56,8 @@ static int g_full_tunnel = 0;
 static int g_kill_switch = 0;
 static int g_show_tutorial = 0;
 static int g_tutorial_step = 0;
+static int g_selected_user_agent = 0;
+static int g_user_agent_dropdown_open = 0;
 
 static RECT g_rect_title;
 static RECT g_rect_server_label;
@@ -66,6 +68,9 @@ static RECT g_rect_btn_connect;
 static RECT g_rect_toggle_full;
 static RECT g_rect_toggle_kill;
 static RECT g_rect_info_box;
+static RECT g_rect_user_agent_label;
+static RECT g_rect_user_agent_box;
+static RECT g_rect_user_agent_dropdown;
 
 static int g_hover_connect = 0;
 static int g_hover_add = 0;
@@ -73,12 +78,88 @@ static int g_hover_dropdown = 0;
 static int g_hover_toggle_full = 0;
 static int g_hover_toggle_kill = 0;
 static int g_dropdown_open = 0;
+static int g_hover_user_agent = 0;
 
 static char g_add_name[64] = {0};
 static char g_add_host[256] = {0};
 static char g_add_port[16] = "443";
 static char g_add_key[512] = {0};
 static char g_add_user[64] = "root";
+
+// User agent list
+#define MAX_USER_AGENTS 5000
+static char g_user_agents[MAX_USER_AGENTS][512];
+static int g_user_agent_count = 0;
+static int g_randomize_user_agent = 0;  // 0 = use selected, 1 = randomize
+
+// Load user agents from file
+static void load_user_agents(void) {
+    if (g_user_agent_count > 0) return;  // Already loaded
+    
+    char ua_path[512];
+    // Try multiple locations
+    snprintf(ua_path, sizeof(ua_path), "%s\\user_agents.txt", g_ctx ? g_ctx->config_dir : "");
+    FILE* f = fopen(ua_path, "r");
+    if (!f) {
+        // Try resources directory
+        char exe_path[MAX_PATH];
+        GetModuleFileNameA(NULL, exe_path, MAX_PATH);
+        char* last_slash = strrchr(exe_path, '\\');
+        if (last_slash) {
+            *last_slash = '\0';
+            snprintf(ua_path, sizeof(ua_path), "%s\\resources\\user_agents.txt", exe_path);
+            f = fopen(ua_path, "r");
+        }
+    }
+    if (!f) {
+        // Try current directory
+        f = fopen("user_agents.txt", "r");
+    }
+    
+    if (f) {
+        char line[512];
+        while (fgets(line, sizeof(line), f) && g_user_agent_count < MAX_USER_AGENTS) {
+            // Remove newline
+            char* nl = strchr(line, '\r');
+            if (nl) *nl = '\0';
+            nl = strchr(line, '\n');
+            if (nl) *nl = '\0';
+            
+            // Skip empty lines
+            if (line[0] == '\0') continue;
+            
+            strncpy(g_user_agents[g_user_agent_count], line, sizeof(g_user_agents[0]) - 1);
+            g_user_agents[g_user_agent_count][sizeof(g_user_agents[0]) - 1] = '\0';
+            g_user_agent_count++;
+        }
+        fclose(f);
+    }
+    
+    // If no file found, add some defaults
+    if (g_user_agent_count == 0) {
+        strcpy(g_user_agents[0], "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+        strcpy(g_user_agents[1], "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36");
+        strcpy(g_user_agents[2], "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36");
+        g_user_agent_count = 3;
+    }
+}
+
+// Get current user agent (selected or random)
+static const char* get_current_user_agent(void) {
+    if (g_user_agent_count == 0) load_user_agents();
+    if (g_user_agent_count == 0) return "Mozilla/5.0";
+    
+    if (g_randomize_user_agent) {
+        int idx = rand() % g_user_agent_count;
+        return g_user_agents[idx];
+    }
+    
+    if (g_selected_user_agent >= 0 && g_selected_user_agent < g_user_agent_count) {
+        return g_user_agents[g_selected_user_agent];
+    }
+    
+    return g_user_agents[0];
+}
 
 static const char* TUTORIAL_TITLES[] = {
     "Welcome to HelloWorld!",
@@ -223,6 +304,13 @@ static void init_layout(int w, int h) {
     y += 44;
     
     SetRect(&g_rect_toggle_kill, card_x, y, card_x + card_w, y + 36);
+    y += 44;
+    
+    // User agent selector
+    SetRect(&g_rect_user_agent_label, card_x, y, card_x + card_w, y + 16);
+    y += 20;
+    SetRect(&g_rect_user_agent_box, card_x, y, card_x + card_w, y + 40);
+    SetRect(&g_rect_user_agent_dropdown, card_x, y + 40, card_x + card_w, y + 40 + 200);
     y += 52;
     
     SetRect(&g_rect_info_box, card_x, y, card_x + card_w, h - margin);
@@ -317,53 +405,60 @@ static void draw_info_box(HDC hdc, RECT* rc) {
     RECT r;
     
     if (g_ctx && g_ctx->status == HW_CONNECTED) {
+        // Server Time
         SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
-        draw_text_left(hdc, "STATUS", &r, g_font_small, CLR_TEXT_DIM);
+        draw_text_left(hdc, "SERVER TIME", &r, g_font_small, CLR_TEXT_DIM);
         y += 18;
         
         SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
-        draw_text_left(hdc, "Connected", &r, g_font_normal, CLR_ACCENT);
-        y += line_h + 10;
-        
-        SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
-        draw_text_left(hdc, "MODE", &r, g_font_small, CLR_TEXT_DIM);
-        y += 18;
-        
-        SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
-        const char* mode = g_ctx->mode == HW_MODE_FULL_TUNNEL ? "Full Tunnel (All Traffic)" : "Proxy Mode (SOCKS5)";
-        draw_text_left(hdc, mode, &r, g_font_normal, CLR_TEXT);
-        y += line_h + 10;
-        
-        SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
-        draw_text_left(hdc, "YOUR IP", &r, g_font_small, CLR_TEXT_DIM);
-        y += 18;
-        
-        SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
-        char ip_display[128];
-        snprintf(ip_display, sizeof(ip_display), "%s", 
-                 g_ctx->stats.public_ip[0] ? g_ctx->stats.public_ip : "Fetching...");
-        draw_text_left(hdc, ip_display, &r, g_font_button, CLR_ACCENT);
-        y += line_h + 10;
-        
-        SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
-        draw_text_left(hdc, "SERVER", &r, g_font_small, CLR_TEXT_DIM);
-        y += 18;
-        
-        SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
-        if (g_ctx->current_server >= 0 && g_ctx->current_server < g_ctx->server_count) {
-            draw_text_left(hdc, g_ctx->servers[g_ctx->current_server].name, &r, g_font_normal, CLR_TEXT);
+        char time_str[64];
+        if (g_ctx->stats.server_time[0]) {
+            snprintf(time_str, sizeof(time_str), "%s", g_ctx->stats.server_time);
+        } else {
+            // Fallback to local time if server time not available
+            time_t now = time(NULL);
+            struct tm* t = localtime(&now);
+            strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", t);
         }
+        draw_text_left(hdc, time_str, &r, g_font_normal, CLR_ACCENT);
         y += line_h + 10;
         
+        // DNS Server
         SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
-        draw_text_left(hdc, "DURATION", &r, g_font_small, CLR_TEXT_DIM);
+        draw_text_left(hdc, "DNS", &r, g_font_small, CLR_TEXT_DIM);
         y += 18;
         
-        time_t el = time(NULL) - g_ctx->stats.start_time;
-        char dur[64];
-        snprintf(dur, sizeof(dur), "%02d:%02d:%02d", (int)(el/3600), (int)((el%3600)/60), (int)(el%60));
         SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
-        draw_text_left(hdc, dur, &r, g_font_normal, CLR_TEXT);
+        char dns_display[128];
+        if (g_ctx->stats.dns_server[0]) {
+            snprintf(dns_display, sizeof(dns_display), "%s", g_ctx->stats.dns_server);
+        } else {
+            snprintf(dns_display, sizeof(dns_display), "127.0.0.1:1080 (SOCKS5)");
+        }
+        draw_text_left(hdc, dns_display, &r, g_font_normal, CLR_TEXT);
+        y += line_h + 10;
+        
+        // User Agent
+        SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
+        draw_text_left(hdc, "USER AGENT", &r, g_font_small, CLR_TEXT_DIM);
+        y += 18;
+        
+        SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
+        const char* ua = get_current_user_agent();
+        char ua_display[256];
+        if (g_randomize_user_agent) {
+            snprintf(ua_display, sizeof(ua_display), "[RANDOM] %s", ua);
+        } else {
+            snprintf(ua_display, sizeof(ua_display), "%s", ua);
+        }
+        // Truncate if too long
+        if (strlen(ua_display) > 50) {
+            ua_display[47] = '.';
+            ua_display[48] = '.';
+            ua_display[49] = '.';
+            ua_display[50] = '\0';
+        }
+        draw_text_left(hdc, ua_display, &r, g_font_small, CLR_TEXT);
     } else {
         SetRect(&r, rc->left + pad, y, rc->right - pad, y + line_h);
         draw_text_left(hdc, "STATUS", &r, g_font_small, CLR_TEXT_DIM);
@@ -688,9 +783,17 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                 g_selected_server = g_ctx->current_server >= 0 ? g_ctx->current_server : 0;
                 g_full_tunnel = g_ctx->mode == HW_MODE_FULL_TUNNEL;
                 g_kill_switch = g_ctx->kill_switch;
+                // Set initial user agent
+                const char* ua = get_current_user_agent();
+                if (ua) {
+                    strncpy(g_ctx->stats.user_agent, ua, sizeof(g_ctx->stats.user_agent) - 1);
+                    g_ctx->stats.user_agent[sizeof(g_ctx->stats.user_agent) - 1] = '\0';
+                }
             }
             
             g_show_tutorial = check_first_run();
+            load_user_agents();  // Load user agents on startup
+            srand((unsigned int)time(NULL));  // Seed random for user agent randomization
             SetTimer(hwnd, ID_TIMER_UPDATE, 1000, NULL);
             return 0;
         }
@@ -715,7 +818,22 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         }
         
         case WM_TIMER:
-            InvalidateRect(hwnd, NULL, FALSE);
+            if (wp == ID_TIMER_UPDATE) {
+                // Update server time and DNS periodically
+                if (g_ctx && g_ctx->status == HW_CONNECTED) {
+                    hw_fetch_server_time(g_ctx);
+                    hw_fetch_dns_info(g_ctx);
+                    // Update user agent if randomizing
+                    if (g_randomize_user_agent) {
+                        const char* ua = get_current_user_agent();
+                        if (ua) {
+                            strncpy(g_ctx->stats.user_agent, ua, sizeof(g_ctx->stats.user_agent) - 1);
+                            g_ctx->stats.user_agent[sizeof(g_ctx->stats.user_agent) - 1] = '\0';
+                        }
+                    }
+                }
+                InvalidateRect(hwnd, NULL, FALSE);
+            }
             return 0;
         
         case WM_MOUSEMOVE: {
@@ -839,8 +957,27 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             } else if (PtInRect(&g_rect_toggle_kill, pt)) {
                 g_kill_switch = !g_kill_switch;
                 InvalidateRect(hwnd, NULL, FALSE);
+            } else if (PtInRect(&g_rect_user_agent_box, pt)) {
+                g_user_agent_dropdown_open = !g_user_agent_dropdown_open;
+                g_dropdown_open = 0;  // Close server dropdown if open
+            } else if (g_user_agent_dropdown_open && PtInRect(&g_rect_user_agent_dropdown, pt)) {
+                int idx = (y - g_rect_user_agent_dropdown.top - 10) / 32;
+                if (idx == 0) {
+                    // Randomize option
+                    g_randomize_user_agent = !g_randomize_user_agent;
+                } else if (idx > 0 && idx <= g_user_agent_count) {
+                    g_selected_user_agent = idx - 1;
+                    g_randomize_user_agent = 0;
+                }
+                g_user_agent_dropdown_open = 0;
+                if (g_ctx) {
+                    strncpy(g_ctx->stats.user_agent, get_current_user_agent(), sizeof(g_ctx->stats.user_agent) - 1);
+                    g_ctx->stats.user_agent[sizeof(g_ctx->stats.user_agent) - 1] = '\0';
+                }
+                InvalidateRect(hwnd, NULL, FALSE);
             } else {
                 g_dropdown_open = 0;
+                g_user_agent_dropdown_open = 0;
             }
             return 0;
         }

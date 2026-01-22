@@ -75,35 +75,15 @@ The `.gitignore` in this repo blocks sensitive files, but **always double-check 
 
 ---
 
-## Building From Source
+## Installation
 
-### Client (Windows)
+### Client
 
-```powershell
-cd client
-mkdir build && cd build
-cmake .. -G "Visual Studio 17 2022"
-cmake --build . --config Release
-```
+**Windows & macOS**: Download the pre-built binary from [Releases](https://github.com/dokabi-recon67/helloworld/releases)
 
-### Client (macOS)
+No compilation required - just download and run!
 
-```bash
-cd client
-mkdir build && cd build
-cmake ..
-make
-```
-
-### Server (Linux)
-
-```bash
-cd server
-mkdir build && cd build
-cmake ..
-make
-sudo make install
-```
+**Note**: Source code is not included in releases. Only pre-compiled binaries are provided for security and ease of use.
 
 ---
 

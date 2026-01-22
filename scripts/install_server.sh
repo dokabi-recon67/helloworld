@@ -158,8 +158,23 @@ cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup 2>/dev/null || true
 sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
 sed -i 's/PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
 sed -i 's/#PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
+
+# Additional SSH hardening
+echo "Protocol 2" >> /etc/ssh/sshd_config
+echo "MaxAuthTries 3" >> /etc/ssh/sshd_config
+echo "ClientAliveInterval 300" >> /etc/ssh/sshd_config
+echo "ClientAliveCountMax 2" >> /etc/ssh/sshd_config
+echo "PermitEmptyPasswords no" >> /etc/ssh/sshd_config
+echo "X11Forwarding no" >> /etc/ssh/sshd_config
+echo "PrintMotd no" >> /etc/ssh/sshd_config
+
+# Disable root login if not already
+if ! grep -q "^PermitRootLogin" /etc/ssh/sshd_config; then
+    echo "PermitRootLogin prohibit-password" >> /etc/ssh/sshd_config
+fi
+
 systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null || service ssh restart 2>/dev/null || true
-print_status "SSH secured (key-only authentication)"
+print_status "SSH secured (key-only authentication, hardened)"
 
 # Open firewall port 443
 echo ""

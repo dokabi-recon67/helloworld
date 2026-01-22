@@ -218,11 +218,30 @@ bool hw_nonce_check_collision(nonce_ctx_t* ctx, const uint8_t* nonce);
 #define HW_MAX_STREAMS_PER_SESSION 16
 #define HW_MAX_BYTES_BUFFERED (1024 * 1024)  // 1MB per session
 
+// Global resource limits
+#define HW_GLOBAL_MAX_CONNECTIONS 100
+#define HW_GLOBAL_MAX_HANDSHAKE_CONCURRENCY 20
+#define HW_GLOBAL_MAX_MEMORY_BUDGET (100 * 1024 * 1024)  // 100MB total
+#define HW_CPU_TIME_SLICE_MS 10  // 10ms per connection
+
 typedef struct {
+    // Per-IP/per-session limits
     uint32_t connections_per_ip[HW_MAX_SERVERS];
     uint32_t unauthenticated_handshakes;
     uint32_t streams_per_session;
     uint64_t bytes_buffered;
+    
+    // Global limits
+    uint32_t global_connections;
+    uint32_t global_handshake_concurrency;
+    uint64_t global_memory_budget;
+    uint64_t global_memory_used;
+    
+    // Fairness
+    time_t last_cpu_slice[HW_MAX_SERVERS];
+    uint32_t priority_control_frames;
+    uint32_t priority_bulk_data;
+    
     time_t last_cleanup;
 } resource_caps_t;
 

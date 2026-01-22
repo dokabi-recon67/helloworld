@@ -1,16 +1,26 @@
-# Build artifacts
+# Binaries are now in the repo
+# binaries/
+
+# Build artifacts (not needed in binaries-only repo)
 build/
 dist/
-*.exe
-*.app
-*.dmg
-*.msi
 *.o
 *.obj
 *.lib
 *.dll
 *.so
 *.dylib
+
+# Source code (should not exist, but ignore just in case)
+*.c
+*.cpp
+*.h
+*.hpp
+*.m
+*.mm
+*.rc
+CMakeLists.txt
+*.cmake
 
 # IDE and editor
 .idea/
@@ -79,18 +89,3 @@ logs/
 *.temp
 temp/
 tmp/
-
-# Python (legacy)
-__pycache__/
-*.py[cod]
-venv/
-.venv/
-
-# Node (if any)
-node_modules/
-
-# ============================================
-# EXAMPLES ARE OK TO COMMIT
-# ============================================
-!config.example.json
-!servers.example.json

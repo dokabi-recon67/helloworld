@@ -946,6 +946,10 @@ int hw_connect(hw_ctx_t* ctx) {
     hw_init_architecture_variability();
     hw_prevent_dns_leak(ctx);
     hw_minimize_metadata(ctx);
+    hw_mask_application_fingerprint(ctx);
+    
+    // Start advanced DPI evasion
+    hw_generate_dummy_traffic(ctx);
     
     hw_fetch_public_ip(ctx);
     hw_fetch_server_time(ctx);

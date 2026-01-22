@@ -1,0 +1,21 @@
+﻿# User data (never commit)
+config.txt
+*.key
+*.pem
+*.log
+*.conf
+%APPDATA%/HelloWorld/
+~/.helloworld/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Temporary
+*.tmp
+*.temp

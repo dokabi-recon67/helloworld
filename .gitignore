@@ -1,16 +1,24 @@
 # Build artifacts
 build/
 dist/
-*.exe
-*.app
-*.dmg
-*.msi
 *.o
 *.obj
 *.lib
 *.dll
 *.so
 *.dylib
+
+# Source code - keep locally, don't push to GitHub
+client/src/
+client/include/
+!client/include/helloworld.h
+!binaries/
+
+# Binaries - ONLY push binaries, not source
+!binaries/**/*.exe
+!binaries/**/*.app
+!binaries/**/*.dmg
+!binaries/**/*.msi
 
 # IDE and editor
 .idea/

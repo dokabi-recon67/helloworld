@@ -11,7 +11,11 @@ dist/
 # Source code - keep locally, don't push to GitHub
 client/src/
 client/include/
-!client/include/helloworld.h
+server/src/
+server/include/
+CMakeLists.txt
+server/CMakeLists.txt
+client/CMakeLists.txt
 !binaries/
 
 # Binaries - ONLY push binaries, not source

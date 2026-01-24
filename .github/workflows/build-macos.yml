@@ -1,0 +1,68 @@
+name: Build macOS Binary
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'client/**'
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Install dependencies
+      run: |
+        brew install cmake || true
+        
+    - name: Build macOS binary
+      run: |
+        cd client
+        mkdir build && cd build
+        cmake ..
+        make -j$(sysctl -n hw.ncpu)
+        
+    - name: Create app bundle
+      run: |
+        mkdir -p binaries/macos/helloworld.app/Contents/MacOS
+        mkdir -p binaries/macos/helloworld.app/Contents/Resources
+        cp client/build/helloworld binaries/macos/helloworld.app/Contents/MacOS/HelloWorld
+        
+        cat > binaries/macos/helloworld.app/Contents/Info.plist << 'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>CFBundleExecutable</key>
+            <string>HelloWorld</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.helloworld.client</string>
+            <key>CFBundleName</key>
+            <string>HelloWorld</string>
+            <key>CFBundleVersion</key>
+            <string>1.0.0</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.0.0</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>11.0</string>
+            <key>NSHighResolutionCapable</key>
+            <true/>
+        </dict>
+        </plist>
+        EOF
+        
+    - name: Commit and push binary
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add binaries/macos/helloworld.app
+        git commit -m "Add macOS binary (built by GitHub Actions)" || exit 0
+        git push
+

@@ -1,0 +1,8 @@
+C:\helloworld\client\src\core.c;C:\helloworld\client\build\helloworld.dir\Release\core.obj
+C:\helloworld\client\src\tunnel.c;C:\helloworld\client\build\helloworld.dir\Release\tunnel.obj
+C:\helloworld\client\src\network.c;C:\helloworld\client\build\helloworld.dir\Release\network.obj
+C:\helloworld\client\src\config.c;C:\helloworld\client\build\helloworld.dir\Release\config.obj
+C:\helloworld\client\src\stealth.c;C:\helloworld\client\build\helloworld.dir\Release\stealth.obj
+C:\helloworld\client\src\stealth_active.c;C:\helloworld\client\build\helloworld.dir\Release\stealth_active.obj
+C:\helloworld\client\src\security.c;C:\helloworld\client\build\helloworld.dir\Release\security.obj
+C:\helloworld\client\src\gui_win32.cpp;C:\helloworld\client\build\helloworld.dir\Release\gui_win32.obj

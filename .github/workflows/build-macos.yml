@@ -15,6 +15,20 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+        
+    - name: Checkout source code from history
+      run: |
+        # Try to get source code from git history before binaries-only conversion
+        git log --all --full-history --source -- client/ | head -1 || echo "Source code not in history"
+        # If source code exists locally in working directory, use it
+        if [ -d "client" ]; then
+          echo "Source code found in working directory"
+        else
+          echo "ERROR: Source code not found. Need to add client/ directory to build."
+          exit 1
+        fi
       
     - name: Install dependencies
       run: |
@@ -22,8 +36,12 @@ jobs:
         
     - name: Build macOS binary
       run: |
+        if [ ! -d "client" ]; then
+          echo "ERROR: client/ directory not found. Cannot build."
+          exit 1
+        fi
         cd client
-        mkdir build && cd build
+        mkdir -p build && cd build
         cmake ..
         make -j$(sysctl -n hw.ncpu)
         

@@ -15,7 +15,7 @@ HelloWorld is a secure, stealthy tunnel client that routes your traffic through 
 ### 2. Set Up Your Server
 Run this command on your server (Linux VM):
 ```bash
-curl -sSL https://raw.githubusercontent.com/dokabi-recon67/helloworld/main/scripts/install_server.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/dokabi-recon67/helloworld/main/binaries/scripts/install_server.sh | sudo bash
 ```
 
 ### 3. Configure Client

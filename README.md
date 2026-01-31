@@ -38,7 +38,7 @@ HelloWorld creates a **stealth tunnel** between your computer and a cloud VM you
 SSH into your VM and run:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/dokabi-recon67/helloworld/main/scripts/install_server.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/dokabi-recon67/helloworld/main/clean/scripts/install_server.sh | sudo bash
 ```
 
 This automatically:
@@ -163,7 +163,7 @@ All major threat models are hardened:
 Run the installation script on your Linux VM:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/dokabi-recon67/helloworld/main/scripts/install_server.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/dokabi-recon67/helloworld/main/clean/scripts/install_server.sh | sudo bash
 ```
 
 The script automatically:

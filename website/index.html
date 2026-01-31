@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HelloWorld - Stealth Tunnel with Tor Integration</title>
+    <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>HelloWorld</h1>
+            <p class="tagline">Maximum Stealth Tunnel - Now with Tor Integration</p>
+        </header>
+
+        <section class="hero">
+            <div class="hero-content">
+                <h2>Your Traffic. Your Server. Complete Anonymity.</h2>
+                <p>Advanced stealth tunnel indistinguishable from normal HTTPS. Self-hosted on your cloud VM. <strong>v2 now routes through Tor</strong> for automatic IP rotation every 100 requests.</p>
+                <div class="cta-buttons">
+                    <a href="#download" class="btn btn-primary">Download</a>
+                    <a href="https://github.com/dokabi-recon67/helloworld" class="btn btn-secondary">GitHub</a>
+                </div>
+            </div>
+        </section>
+
+        <section class="versions" id="versions">
+            <h2>Choose Your Version</h2>
+            <div class="version-grid">
+                <div class="version-card">
+                    <div class="version-badge">v1</div>
+                    <h3>Standard Edition</h3>
+                    <p class="version-subtitle">Fast & Reliable</p>
+                    <ul class="version-features">
+                        <li>✅ TLS on port 443 (stealth)</li>
+                        <li>✅ SSH encryption</li>
+                        <li>✅ 100% DNS privacy</li>
+                        <li>✅ ~1.3s latency</li>
+                        <li>⚠️ Exit IP = Your server</li>
+                    </ul>
+                    <p class="version-best">Best for: Speed, streaming, gaming</p>
+                    <a href="#quickstart-v1" class="btn btn-outline">Setup Guide</a>
+                </div>
+                <div class="version-card featured">
+                    <div class="version-badge new">v2 NEW</div>
+                    <h3>Tor Edition</h3>
+                    <p class="version-subtitle">Maximum Anonymity</p>
+                    <ul class="version-features">
+                        <li>✅ Everything in v1</li>
+                        <li>✅ Tor network routing</li>
+                        <li>✅ IP rotation every 100 requests</li>
+                        <li>✅ ~2.1s latency</li>
+                        <li>✅ Exit IP = Random Tor node</li>
+                    </ul>
+                    <p class="version-best">Best for: Anonymity, research, bypassing bans</p>
+                    <a href="#quickstart-v2" class="btn btn-primary">Setup Guide</a>
+                </div>
+            </div>
+        </section>
+
+        <section class="test-results" id="results">
+            <h2>Live Test Results (January 2026)</h2>
+            <div class="results-grid">
+                <div class="result-card">
+                    <h3>IP Leak Prevention</h3>
+                    <div class="result-value">100%</div>
+                    <p>Zero leaks across all tests</p>
+                </div>
+                <div class="result-card">
+                    <h3>DNS Privacy</h3>
+                    <div class="result-value">100%</div>
+                    <p>All queries through tunnel</p>
+                </div>
+                <div class="result-card">
+                    <h3>Connection Reliability</h3>
+                    <div class="result-value">100%</div>
+                    <p>50/50 requests successful</p>
+                </div>
+                <div class="result-card">
+                    <h3>Tor Exit Locations</h3>
+                    <div class="result-value">Global</div>
+                    <p>NL, DE, SE, HK verified</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="architecture" id="architecture">
+            <h2>How It Works</h2>
+            <div class="arch-comparison">
+                <div class="arch-card">
+                    <h3>v1 Standard</h3>
+                    <div class="arch-diagram">
+                        <div class="arch-step">Your PC</div>
+                        <div class="arch-arrow">↓ TLS (443)</div>
+                        <div class="arch-step">Your Server</div>
+                        <div class="arch-arrow">↓</div>
+                        <div class="arch-step highlight">Internet</div>
+                    </div>
+                    <p class="arch-note">Exit: Your Server IP</p>
+                </div>
+                <div class="arch-card featured">
+                    <h3>v2 Tor Edition</h3>
+                    <div class="arch-diagram">
+                        <div class="arch-step">Your PC</div>
+                        <div class="arch-arrow">↓ TLS (443)</div>
+                        <div class="arch-step">Your Server</div>
+                        <div class="arch-arrow">↓ Tor</div>
+                        <div class="arch-step">Tor Network</div>
+                        <div class="arch-arrow">↓</div>
+                        <div class="arch-step highlight">Internet</div>
+                    </div>
+                    <p class="arch-note">Exit: Random Tor Node (Rotates!)</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="features" id="features">
+            <h2>Security Features</h2>
+            <div class="feature-grid">
+                <div class="feature">
+                    <div class="feature-icon">🔒</div>
+                    <h3>5-Layer Encryption</h3>
+                    <p>TLS 1.3 + SSH + Tor (3 layers). Even if one layer breaks, four remain.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🎭</div>
+                    <h3>Browser Fingerprints</h3>
+                    <p>Mimics Chrome, Firefox, Safari TLS signatures. Undetectable by DPI.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🔄</div>
+                    <h3>IP Rotation (v2)</h3>
+                    <p>Automatic new IP every 100 requests. Defeats tracking.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🌐</div>
+                    <h3>Port 443</h3>
+                    <p>All traffic on standard HTTPS port. Impossible to block without breaking the internet.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🛡️</div>
+                    <h3>Zero Trust</h3>
+                    <p>Self-hosted. No third parties. No logs. You control everything.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">📡</div>
+                    <h3>DNS Privacy</h3>
+                    <p>100% DNS queries through tunnel. Zero ISP visibility.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="download" id="download">
+            <h2>Download</h2>
+            <div class="download-grid">
+                <div class="download-card">
+                    <h3>Windows Client</h3>
+                    <p>Windows 10/11 64-bit</p>
+                    <p class="version-info">Works with both v1 and v2 servers</p>
+                    <a href="https://github.com/dokabi-recon67/helloworld/raw/main/clean/binaries/windows/helloworld.exe" class="btn btn-download">Download .exe</a>
+                </div>
+                <div class="download-card">
+                    <h3>macOS Client</h3>
+                    <p>macOS 11+ (Intel & Apple Silicon)</p>
+                    <p class="version-info">Coming Soon</p>
+                    <a href="#" class="btn btn-download disabled">Coming Soon</a>
+                </div>
+            </div>
+        </section>
+
+        <section class="quickstart" id="quickstart-v1">
+            <h2>Quick Start: v1 (Standard)</h2>
+            <div class="steps-simple">
+                <div class="step-card">
+                    <div class="step-number">1</div>
+                    <h3>Get a Cloud VM</h3>
+                    <p>Create a free VM on Oracle Cloud or Google Cloud ($0/month)</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">2</div>
+                    <h3>Install Server</h3>
+                    <pre><code>curl -sSL https://raw.githubusercontent.com/dokabi-recon67/helloworld/main/clean/scripts/install_server.sh | sudo bash</code></pre>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">3</div>
+                    <h3>Add SSH Key</h3>
+                    <pre><code>echo 'YOUR_PUBLIC_KEY' >> ~/.ssh/authorized_keys
+chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys</code></pre>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">4</div>
+                    <h3>Connect</h3>
+                    <p>Download client, add your server IP, click CONNECT!</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="quickstart" id="quickstart-v2">
+            <h2>Quick Start: v2 (Tor Edition)</h2>
+            <div class="steps-simple">
+                <div class="step-card">
+                    <div class="step-number">1</div>
+                    <h3>Get a Cloud VM</h3>
+                    <p>Create a free VM on Oracle Cloud or Google Cloud ($0/month)</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">2</div>
+                    <h3>Install Server with Tor</h3>
+                    <pre><code>curl -sSL https://raw.githubusercontent.com/dokabi-recon67/helloworld/main/v2tor/scripts/install_server_tor.sh | sudo bash</code></pre>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">3</div>
+                    <h3>Add SSH Key</h3>
+                    <pre><code>echo 'YOUR_PUBLIC_KEY' >> ~/.ssh/authorized_keys
+chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys</code></pre>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">4</div>
+                    <h3>Check Status</h3>
+                    <pre><code>helloworld-status</code></pre>
+                    <p>Shows your server IP and current Tor exit IP!</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">5</div>
+                    <h3>Connect</h3>
+                    <p>Download client, add your server IP, click CONNECT. Your traffic now exits via Tor!</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="comparison" id="comparison">
+            <h2>HelloWorld vs. Others</h2>
+            <div class="comparison-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th>Commercial VPN</th>
+                            <th>Tor Browser</th>
+                            <th>HelloWorld v1</th>
+                            <th>HelloWorld v2</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Stealth (DPI Resistance)</td>
+                            <td>❌ Low</td>
+                            <td>❌ Low</td>
+                            <td>✅ High</td>
+                            <td>✅ High</td>
+                        </tr>
+                        <tr>
+                            <td>Self-Hosted</td>
+                            <td>❌ No</td>
+                            <td>✅ Yes</td>
+                            <td>✅ Yes</td>
+                            <td>✅ Yes</td>
+                        </tr>
+                        <tr>
+                            <td>IP Anonymity</td>
+                            <td>⚠️ Provider</td>
+                            <td>✅ Tor</td>
+                            <td>⚠️ Server</td>
+                            <td>✅ Tor</td>
+                        </tr>
+                        <tr>
+                            <td>IP Rotation</td>
+                            <td>❌ Manual</td>
+                            <td>✅ Circuit</td>
+                            <td>❌ No</td>
+                            <td>✅ Auto (100 req)</td>
+                        </tr>
+                        <tr>
+                            <td>Speed</td>
+                            <td>⚡ Fast</td>
+                            <td>🐢 Slow</td>
+                            <td>⚡ Fast</td>
+                            <td>🐢 Moderate</td>
+                        </tr>
+                        <tr>
+                            <td>Trust Required</td>
+                            <td>❌ Provider</td>
+                            <td>✅ None</td>
+                            <td>✅ None</td>
+                            <td>✅ None</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="security-notice" id="privacy">
+            <h2>Your Privacy</h2>
+            <div class="privacy-grid">
+                <div class="privacy-card">
+                    <h3>No Data Collection</h3>
+                    <p>Zero telemetry. Zero analytics. The app never phones home.</p>
+                </div>
+                <div class="privacy-card">
+                    <h3>Self-Hosted</h3>
+                    <p>You control the server. No third parties. No subscription.</p>
+                </div>
+                <div class="privacy-card">
+                    <h3>Open Source</h3>
+                    <p>Full source code available. Verify security yourself.</p>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <p>HelloWorld - Maximum Stealth, Maximum Privacy, Your Control</p>
+            <p><strong>v1</strong> for speed | <strong>v2</strong> for anonymity</p>
+            <div class="footer-links">
+                <a href="https://github.com/dokabi-recon67/helloworld">GitHub</a>
+                <a href="https://github.com/dokabi-recon67/helloworld/blob/main/INVESTOR_REPORT_HELLOWORLD_V2.md">Technical Report</a>
+                <a href="https://github.com/dokabi-recon67/helloworld/tree/main/docs">Documentation</a>
+                <a href="#download">Download</a>
+            </div>
+        </footer>
+    </div>
+
+    <script src="static/js/main.js"></script>
+</body>
+</html>

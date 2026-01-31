@@ -231,19 +231,40 @@ else
 fi
 
 echo ""
-echo "IP Addresses:"
-SERVER_IP=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null || echo "error")
+echo "========================================"
+echo "IP Addresses (for client config)"
+echo "========================================"
+
+# Get REAL server IP (GCP metadata or direct curl without Tor)
+# Try GCP metadata first (most reliable)
+SERVER_IP=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip 2>/dev/null)
+
+# Fallback to direct curl if not on GCP
+if [ -z "$SERVER_IP" ] || [ "$SERVER_IP" == "" ]; then
+    SERVER_IP=$(curl -s --max-time 5 --noproxy '*' https://api.ipify.org 2>/dev/null || echo "error")
+fi
+
+# Get Tor exit IP (through Tor SOCKS)
 TOR_IP=$(curl -s --socks5 127.0.0.1:9050 --max-time 10 https://api.ipify.org 2>/dev/null || echo "error")
-echo "  Server IP: $SERVER_IP"
-echo "  Tor Exit:  $TOR_IP"
+
+echo ""
+echo "  🖥️  SERVER IP: $SERVER_IP"
+echo "      (Use this in HelloWorld client config)"
+echo ""
+echo "  🧅 TOR EXIT:  $TOR_IP"
+echo "      (Your traffic appears from this IP)"
+echo ""
 
 if [ "$TOR_IP" != "error" ] && [ "$TOR_IP" != "$SERVER_IP" ]; then
-    echo ""
-    echo "✅ Tor is working! Traffic exits via Tor."
+    echo "✅ Tor is working! IPs are different."
+else
+    echo "⚠️  Warning: Check Tor status"
 fi
 
 echo ""
+echo "========================================"
 echo "Rotation: Every 100 requests"
+echo "========================================"
 echo ""
 echo "Commands:"
 echo "  helloworld-status         - This status"

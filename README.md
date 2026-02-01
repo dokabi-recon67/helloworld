@@ -195,12 +195,14 @@ sudo systemctl restart tor     # Restart Tor
 ## 💻 Requirements
 
 ### Client
-- Windows 10+ (macOS coming soon)
+- Windows 10+
+- **helloworld.exe**: ~60 KB (written in C)
 - ~60 MB RAM
 
 ### Server
 - Linux VM (Debian/Ubuntu)
 - Port 443 open
+- **install_server.sh**: ~4 KB (very lightweight)
 - 1 GB RAM (v2 with Tor)
 
 ### Free Cloud Options

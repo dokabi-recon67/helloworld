@@ -411,44 +411,19 @@ curl -sSL https://raw.githubusercontent.com/dokabi-recon67/helloworld/main/v2tor
 
 ---
 
-## 10. Roadmap
+## 10. Business Model Options
 
-### Q1 2026 (Current)
-- ✅ Windows client stable
-- ✅ v1 (standard) production ready
-- ✅ v2 (Tor) production ready
-- 🔄 macOS client in development
-
-### Q2 2026
-- 📋 macOS client release
-- 📋 Mobile app (iOS/Android)
-- 📋 Browser extension
-
-### Q3 2026
-- 📋 Multi-server load balancing
-- 📋 GUI server management
-- 📋 Enterprise features
-
-### Q4 2026
-- 📋 Managed service offering
-- 📋 API for developers
-- 📋 White-label solution
-
----
-
-## 11. Business Model Options
-
-### 11.1 Open Source + Services
+### 10.1 Open Source + Services
 - Core product free and open source
 - Revenue from managed hosting
 - Enterprise support contracts
 
-### 11.2 Freemium
+### 10.2 Freemium
 - Basic version free
 - Premium features (multi-hop, faster servers)
 - Subscription model
 
-### 11.3 B2B Licensing
+### 10.3 B2B Licensing
 - White-label for privacy companies
 - Enterprise deployments
 - Government/NGO contracts
@@ -497,13 +472,6 @@ Verified Tor Exit Nodes:
   - Sweden
   - Hong Kong
 ```
-
-## Appendix B: Source Code
-
-Full source code available at:
-- GitHub: https://github.com/dokabi-recon67/helloworld
-- Components: C (client), Bash (server scripts)
-- License: [To be determined]
 
 ---
 

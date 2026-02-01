@@ -1,0 +1,13 @@
+﻿# Ignore everything
+*
+
+# Except these folders and files
+!v2tor/
+!v2tor/**
+!clean/
+!clean/**
+!README.md
+!INVESTOR_REPORT_HELLOWORLD_V2.md
+!.gitignore
+!website/
+!website/**

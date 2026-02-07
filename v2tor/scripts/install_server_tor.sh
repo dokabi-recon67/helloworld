@@ -6,7 +6,7 @@
 # Usage: curl -sSL <url> | sudo bash
 #
 # Architecture:
-#   Client → TLS (443) → SSH → Server → Tor → Internet
+#   Client -> TLS (443) -> SSH -> Server -> Tor -> Internet
 #   Exit IP = Tor exit node (rotates every 100 requests)
 #
 
@@ -15,7 +15,6 @@ echo "   HelloWorld Server v2 - Tor Edition"
 echo "========================================"
 echo ""
 
-# Check if running as root
 if [ "$EUID" -ne 0 ]; then
     echo "Please run as root: sudo bash $0"
     exit 1
@@ -28,16 +27,12 @@ systemctl stop helloworld-tor-rotate 2>/dev/null || true
 systemctl stop redsocks 2>/dev/null || true
 pkill -9 stunnel 2>/dev/null || true
 pkill -9 redsocks 2>/dev/null || true
-# Remove iptables rules that redirect traffic through Tor
 iptables -t nat -F REDSOCKS 2>/dev/null || true
 iptables -t nat -D OUTPUT -j REDSOCKS 2>/dev/null || true
 iptables -t nat -X REDSOCKS 2>/dev/null || true
 fuser -k 443/tcp 2>/dev/null || true
-echo "   Cleaned up"
+echo "   Done"
 
-set -e
-
-# Detect OS
 if [ -f /etc/debian_version ]; then
     PKG_UPDATE="apt-get update"
     PKG_INSTALL="apt-get install -y"
@@ -45,6 +40,8 @@ else
     echo "This script requires Debian/Ubuntu"
     exit 1
 fi
+
+set -e
 
 echo "[1/9] Updating packages..."
 $PKG_UPDATE > /dev/null 2>&1
@@ -55,10 +52,9 @@ $PKG_INSTALL stunnel4 > /dev/null 2>&1
 echo "[3/9] Installing Tor..."
 $PKG_INSTALL tor > /dev/null 2>&1
 
-echo "[4/9] Installing redsocks (transparent proxy)..."
-$PKG_INSTALL redsocks > /dev/null 2>&1
+echo "[4/9] Installing redsocks..."
+$PKG_INSTALL redsocks netcat-openbsd > /dev/null 2>&1
 
-# All packages installed - disable exit-on-error so config/service steps never crash the script
 set +e
 
 echo "[5/9] Creating directories..."
@@ -70,39 +66,32 @@ echo "[6/9] Generating TLS certificates..."
 openssl req -new -x509 -days 3650 -nodes \
     -out /etc/helloworld/server.pem \
     -keyout /etc/helloworld/server.key \
-    -subj "/CN=localhost" 2>/dev/null
+    -subj "/CN=helloworld-server" 2>/dev/null
 chmod 600 /etc/helloworld/server.key
 chown stunnel4:stunnel4 /etc/helloworld/server.pem /etc/helloworld/server.key 2>/dev/null || true
 
 echo "[7/9] Configuring Tor..."
-cat > /etc/tor/torrc << 'TORRC'
-# HelloWorld Tor Configuration v2
+cat > /etc/tor/torrc << 'EOF'
 RunAsDaemon 1
 SocksPort 127.0.0.1:9050
 ControlPort 127.0.0.1:9051
 CookieAuthentication 0
-
-# Circuit rotation
 MaxCircuitDirtiness 300
 NewCircuitPeriod 30
 CircuitBuildTimeout 15
 NumEntryGuards 3
 LearnCircuitBuildTimeout 1
-
-# Performance
 ConnectionPadding 0
 ReducedConnectionPadding 1
-
-# Logging
 Log notice file /var/log/tor/notices.log
 DataDirectory /var/lib/tor
-TORRC
+EOF
 
 mkdir -p /var/log/tor
 chown debian-tor:debian-tor /var/log/tor 2>/dev/null || true
 
-echo "[8/9] Configuring redsocks (Tor transparent proxy)..."
-cat > /etc/redsocks.conf << 'REDSOCKS'
+echo "[8/9] Configuring redsocks..."
+cat > /etc/redsocks.conf << 'EOF'
 base {
     log_debug = off;
     log_info = on;
@@ -117,11 +106,10 @@ redsocks {
     port = 9050;
     type = socks5;
 }
-REDSOCKS
+EOF
 
 echo "[9/9] Configuring stunnel..."
-cat > /etc/helloworld/stunnel.conf << 'STUNNELCONF'
-; HelloWorld Server v2 - Tor Edition
+cat > /etc/helloworld/stunnel.conf << 'EOF'
 pid = /var/run/stunnel4/stunnel.pid
 setuid = stunnel4
 setgid = stunnel4
@@ -133,47 +121,35 @@ accept = 0.0.0.0:443
 connect = 127.0.0.1:22
 cert = /etc/helloworld/server.pem
 key = /etc/helloworld/server.key
-STUNNELCONF
+TIMEOUTclose = 0
+TIMEOUTconnect = 10
+TIMEOUTidle = 3600
+EOF
 
-# Create iptables setup script
-cat > /etc/helloworld/setup-tor-routing.sh << 'IPTABLES'
+# --- iptables routing script ---
+cat > /etc/helloworld/setup-tor-routing.sh << 'EOF'
 #!/bin/bash
-# Setup Tor transparent routing via redsocks
-# Safe version - only affects outbound HTTP/HTTPS from non-root
-
-# Get Tor user ID
 TOR_UID=$(id -u debian-tor 2>/dev/null || id -u tor 2>/dev/null || echo "")
-
-# Create REDSOCKS chain
 iptables -t nat -N REDSOCKS 2>/dev/null || iptables -t nat -F REDSOCKS
-
-# Don't redirect local/private traffic
 iptables -t nat -A REDSOCKS -d 0.0.0.0/8 -j RETURN
 iptables -t nat -A REDSOCKS -d 10.0.0.0/8 -j RETURN
 iptables -t nat -A REDSOCKS -d 127.0.0.0/8 -j RETURN
 iptables -t nat -A REDSOCKS -d 169.254.0.0/16 -j RETURN
 iptables -t nat -A REDSOCKS -d 172.16.0.0/12 -j RETURN
 iptables -t nat -A REDSOCKS -d 192.168.0.0/16 -j RETURN
-
-# Redirect to redsocks
 iptables -t nat -A REDSOCKS -p tcp -j REDIRECT --to-ports 12345
-
-# Apply to OUTPUT - exclude Tor's own traffic and root
 if [ -n "$TOR_UID" ]; then
     iptables -t nat -A OUTPUT -m owner --uid-owner $TOR_UID -j RETURN
 fi
 iptables -t nat -A OUTPUT -m owner --uid-owner 0 -j RETURN
-
-# Route HTTP/HTTPS through Tor
 iptables -t nat -A OUTPUT -p tcp --dport 80 -j REDSOCKS
 iptables -t nat -A OUTPUT -p tcp --dport 443 -j REDSOCKS
-
 echo "Tor routing enabled"
-IPTABLES
+EOF
 chmod +x /etc/helloworld/setup-tor-routing.sh
 
-# Create Tor rotation script (every 100 requests)
-cat > /usr/local/bin/helloworld-tor-rotate << 'ROTATOR'
+# --- Tor rotator script ---
+cat > /usr/local/bin/helloworld-tor-rotate << 'EOF'
 #!/bin/bash
 ROTATE_AFTER=100
 LOG="/var/log/helloworld-tor-rotator.log"
@@ -186,8 +162,7 @@ rotate_circuit() {
     (echo authenticate '""'; echo signal newnym; echo quit) | nc 127.0.0.1 9051 > /dev/null 2>&1
     sleep 2
     NEW_IP=$(curl -s --socks5 127.0.0.1:9050 --max-time 15 https://icanhazip.com 2>/dev/null || echo "rotating...")
-    log "🔄 ROTATED! New Tor exit IP: $NEW_IP (after $ROTATE_AFTER connections)"
-    # Reset iptables packet counters after rotation
+    log "ROTATED - New Tor exit IP: $NEW_IP"
     iptables -t nat -Z REDSOCKS 2>/dev/null
 }
 
@@ -198,27 +173,22 @@ log "========================================="
 sleep 5
 CURRENT_IP=$(curl -s --socks5 127.0.0.1:9050 --max-time 15 https://icanhazip.com 2>/dev/null || echo "connecting...")
 log "Initial Tor exit IP: $CURRENT_IP"
-
-# Zero iptables counters at start
 iptables -t nat -Z REDSOCKS 2>/dev/null
 
 while true; do
-    # Count TCP connections redirected through redsocks via iptables packet counter
     CONN_COUNT=$(iptables -t nat -L REDSOCKS -v -n 2>/dev/null | grep "REDIRECT" | awk '{print $1}')
     CONN_COUNT=${CONN_COUNT:-0}
-
     if [ "$CONN_COUNT" -ge "$ROTATE_AFTER" ] 2>/dev/null; then
         log "Reached $CONN_COUNT connections (threshold: $ROTATE_AFTER)"
         rotate_circuit
     fi
-
     sleep 3
 done
-ROTATOR
+EOF
 chmod +x /usr/local/bin/helloworld-tor-rotate
 
-# Create systemd services
-cat > /etc/systemd/system/helloworld-stunnel.service << 'SYSTEMD'
+# --- systemd: stunnel ---
+cat > /etc/systemd/system/helloworld-stunnel.service << 'EOF'
 [Unit]
 Description=HelloWorld Stunnel TLS Wrapper
 After=network.target
@@ -226,14 +196,16 @@ After=network.target
 [Service]
 Type=forking
 ExecStart=/usr/bin/stunnel /etc/helloworld/stunnel.conf
+ExecStop=/bin/kill -TERM $MAINPID
 Restart=on-failure
 RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
-SYSTEMD
+EOF
 
-cat > /etc/systemd/system/helloworld-tor-rotate.service << 'ROTSVC'
+# --- systemd: rotator ---
+cat > /etc/systemd/system/helloworld-tor-rotate.service << 'EOF'
 [Unit]
 Description=HelloWorld Tor IP Rotator
 After=tor.service redsocks.service
@@ -246,9 +218,10 @@ RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
-ROTSVC
+EOF
 
-cat > /etc/systemd/system/helloworld-tor-routing.service << 'ROUTESVC'
+# --- systemd: routing ---
+cat > /etc/systemd/system/helloworld-tor-routing.service << 'EOF'
 [Unit]
 Description=HelloWorld Tor Routing Setup
 After=tor.service redsocks.service
@@ -261,128 +234,115 @@ RemainAfterExit=yes
 
 [Install]
 WantedBy=multi-user.target
-ROUTESVC
+EOF
 
-# Create status command
-cat > /usr/local/bin/helloworld-status << 'STATUS'
+# --- status command ---
+cat > /usr/local/bin/helloworld-status << 'EOF'
 #!/bin/bash
 echo ""
 echo "========================================"
 echo "   HelloWorld v2 - Tor Edition"
 echo "========================================"
 echo ""
-
-# Check services
 echo "Services:"
-ss -tlnp 2>/dev/null | grep -q ":443" && echo "  ✅ Stunnel (443)" || echo "  ❌ Stunnel"
-ss -tlnp 2>/dev/null | grep -q ":22" && echo "  ✅ SSH (22)" || echo "  ❌ SSH"
-ss -tlnp 2>/dev/null | grep -q ":9050" && echo "  ✅ Tor SOCKS (9050)" || echo "  ❌ Tor"
-ss -tlnp 2>/dev/null | grep -q ":12345" && echo "  ✅ Redsocks (12345)" || echo "  ❌ Redsocks"
-pgrep -f "helloworld-tor-rotate" > /dev/null && echo "  ✅ IP Rotator" || echo "  ⚠️ Rotator stopped"
-
+ss -tlnp 2>/dev/null | grep -q ":443" && echo "  OK Stunnel (443)" || echo "  XX Stunnel"
+ss -tlnp 2>/dev/null | grep -q ":22" && echo "  OK SSH (22)" || echo "  XX SSH"
+ss -tlnp 2>/dev/null | grep -q ":9050" && echo "  OK Tor SOCKS (9050)" || echo "  XX Tor"
+ss -tlnp 2>/dev/null | grep -q ":12345" && echo "  OK Redsocks (12345)" || echo "  XX Redsocks"
+pgrep -f "helloworld-tor-rotate" > /dev/null && echo "  OK IP Rotator" || echo "  XX Rotator stopped"
 echo ""
 echo "========================================"
 echo "IP Addresses"
 echo "========================================"
-
-# Get REAL server IP from GCP metadata
 SERVER_IP=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip 2>/dev/null)
 if [ -z "$SERVER_IP" ]; then
     SERVER_IP=$(curl -s --max-time 5 --noproxy '*' ifconfig.me 2>/dev/null || echo "unknown")
 fi
-
-# Get Tor exit IP
 TOR_IP=$(curl -s --socks5 127.0.0.1:9050 --max-time 10 https://icanhazip.com 2>/dev/null || echo "error")
-
 echo ""
-echo "  🖥️  SERVER IP: $SERVER_IP"
-echo "      → Use this in HelloWorld client"
+echo "  SERVER IP: $SERVER_IP"
+echo "  TOR EXIT:  $TOR_IP"
 echo ""
-echo "  🧅 TOR EXIT:  $TOR_IP"
-echo "      → Your traffic appears from here"
-echo ""
-
 if [ "$TOR_IP" != "error" ] && [ "$TOR_IP" != "$SERVER_IP" ]; then
-    echo "✅ Tor routing ACTIVE - IPs are different!"
+    echo "  Tor routing ACTIVE - IPs are different!"
 else
-    echo "⚠️  Check Tor/redsocks status"
+    echo "  Check Tor/redsocks status"
 fi
-
-echo ""
-echo "========================================"
-echo "IP Rotation: Every 100 requests"
-echo "========================================"
 echo ""
 echo "Commands:"
 echo "  helloworld-status    - This status"
 echo "  helloworld-newip     - Force new Tor IP now"
 echo ""
-STATUS
+EOF
 chmod +x /usr/local/bin/helloworld-status
 
-# Create manual IP rotation command
-cat > /usr/local/bin/helloworld-newip << 'NEWIP'
+# --- newip command ---
+cat > /usr/local/bin/helloworld-newip << 'EOF'
 #!/bin/bash
 echo "Requesting new Tor circuit..."
 (echo authenticate '""'; echo signal newnym; echo quit) | nc 127.0.0.1 9051 > /dev/null 2>&1
 sleep 3
 NEW_IP=$(curl -s --socks5 127.0.0.1:9050 --max-time 10 https://icanhazip.com)
 echo "New Tor exit IP: $NEW_IP"
-NEWIP
+EOF
 chmod +x /usr/local/bin/helloworld-newip
 
-# Start everything
+# =============================================
+# START SERVICES
+# =============================================
+
 echo ""
 echo "Starting services..."
 
 systemctl daemon-reload
 
-# Start Tor first
+# 1) Tor
 systemctl enable tor
 systemctl restart tor
 echo "Waiting for Tor to bootstrap (30s)..."
 sleep 30
 
-# Test Tor (use multiple services to avoid rate limits)
 TOR_TEST=$(curl -s --socks5 127.0.0.1:9050 --max-time 10 https://icanhazip.com 2>/dev/null)
 if [ -z "$TOR_TEST" ]; then
     TOR_TEST=$(curl -s --socks5 127.0.0.1:9050 --max-time 10 https://ifconfig.me 2>/dev/null)
 fi
 if [ -n "$TOR_TEST" ]; then
-    echo "✅ Tor connected! Exit: $TOR_TEST"
+    echo "Tor connected! Exit: $TOR_TEST"
 else
-    echo "⚠️ Tor still connecting..."
+    echo "Tor still connecting..."
 fi
 
-# Start redsocks
+# 2) Redsocks
 systemctl enable redsocks 2>/dev/null || true
 systemctl restart redsocks 2>/dev/null || redsocks -c /etc/redsocks.conf &
 sleep 2
 
-# Setup Tor routing
+# 3) Tor routing
 /etc/helloworld/setup-tor-routing.sh
 
-# Kill any existing stunnel on 443
+# 4) Stunnel
 pkill -9 stunnel 2>/dev/null || true
 fuser -k 443/tcp 2>/dev/null || true
 sleep 1
-
-# Start stunnel
 systemctl enable helloworld-stunnel
 systemctl start helloworld-stunnel
 
-# Start rotator
+# 5) Rotator
 systemctl enable helloworld-tor-rotate
 systemctl start helloworld-tor-rotate
 
-# Final status
+# =============================================
+# FINAL OUTPUT
+# =============================================
+
+sleep 2
+
 echo ""
 echo "========================================"
 echo "   Installation Complete!"
 echo "========================================"
 echo ""
 
-# Get REAL server IP from GCP metadata
 SERVER_IP=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip 2>/dev/null)
 if [ -z "$SERVER_IP" ]; then
     SERVER_IP=$(curl -s --max-time 5 --noproxy '*' ifconfig.me 2>/dev/null || echo "unknown")
@@ -393,17 +353,17 @@ if [ -z "$TOR_IP" ]; then
     TOR_IP=$(curl -s --socks5 127.0.0.1:9050 --max-time 10 https://ifconfig.me 2>/dev/null || echo "connecting...")
 fi
 
-echo "🖥️  Server IP: $SERVER_IP (use in client config)"
-echo "🧅 Tor Exit:  $TOR_IP (your traffic appears here)"
+echo "Server IP: $SERVER_IP (use in client config)"
+echo "Tor Exit:  $TOR_IP (your traffic appears here)"
 echo ""
 echo "Architecture:"
-echo "  Client → TLS(443) → SSH → Tor → Internet"
+echo "  Client -> TLS(443) -> SSH -> Tor -> Internet"
 echo ""
 echo "Features:"
-echo "  ✅ Double encryption (TLS + SSH)"
-echo "  ✅ Traffic exits via Tor (not server IP)"
-echo "  ✅ IP rotates every 100 connections"
-echo "  ✅ Manual rotation: helloworld-newip"
+echo "  - Double encryption (TLS + SSH)"
+echo "  - Traffic exits via Tor (not server IP)"
+echo "  - IP rotates every 100 connections"
+echo "  - Manual rotation: helloworld-newip"
 echo ""
 echo "Next steps:"
 echo "  1. Add SSH key:"

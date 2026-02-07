@@ -10,8 +10,6 @@
 #   Exit IP = Tor exit node (rotates every 100 requests)
 #
 
-set -e
-
 echo "========================================"
 echo "   HelloWorld Server v2 - Tor Edition"
 echo "========================================"
@@ -22,6 +20,22 @@ if [ "$EUID" -ne 0 ]; then
     echo "Please run as root: sudo bash $0"
     exit 1
 fi
+
+# Clean up previous install (iptables rules block internet!)
+echo "[0/9] Cleaning up previous install..."
+systemctl stop helloworld-stunnel 2>/dev/null || true
+systemctl stop helloworld-tor-rotate 2>/dev/null || true
+systemctl stop redsocks 2>/dev/null || true
+pkill -9 stunnel 2>/dev/null || true
+pkill -9 redsocks 2>/dev/null || true
+# Remove iptables rules that redirect traffic through Tor
+iptables -t nat -F REDSOCKS 2>/dev/null || true
+iptables -t nat -D OUTPUT -j REDSOCKS 2>/dev/null || true
+iptables -t nat -X REDSOCKS 2>/dev/null || true
+fuser -k 443/tcp 2>/dev/null || true
+echo "   Cleaned up"
+
+set -e
 
 # Detect OS
 if [ -f /etc/debian_version ]; then
@@ -43,6 +57,9 @@ $PKG_INSTALL tor > /dev/null 2>&1
 
 echo "[4/9] Installing redsocks (transparent proxy)..."
 $PKG_INSTALL redsocks > /dev/null 2>&1
+
+# All packages installed - disable exit-on-error so config/service steps never crash the script
+set +e
 
 echo "[5/9] Creating directories..."
 mkdir -p /etc/helloworld
@@ -313,9 +330,6 @@ NEW_IP=$(curl -s --socks5 127.0.0.1:9050 --max-time 10 https://icanhazip.com)
 echo "New Tor exit IP: $NEW_IP"
 NEWIP
 chmod +x /usr/local/bin/helloworld-newip
-
-# All packages installed - disable exit-on-error for service starts
-set +e
 
 # Start everything
 echo ""

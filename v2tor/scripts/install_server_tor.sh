@@ -168,7 +168,7 @@ log() {
 rotate_circuit() {
     (echo authenticate '""'; echo signal newnym; echo quit) | nc 127.0.0.1 9051 > /dev/null 2>&1
     sleep 2
-    NEW_IP=$(curl -s --socks5 127.0.0.1:9050 --max-time 15 https://api.ipify.org 2>/dev/null || echo "rotating...")
+    NEW_IP=$(curl -s --socks5 127.0.0.1:9050 --max-time 15 https://icanhazip.com 2>/dev/null || echo "rotating...")
     log "🔄 ROTATED! New Tor exit IP: $NEW_IP (after $ROTATE_AFTER connections)"
     # Reset iptables packet counters after rotation
     iptables -t nat -Z REDSOCKS 2>/dev/null
@@ -179,7 +179,7 @@ log "Tor Rotator Started (every $ROTATE_AFTER connections)"
 log "========================================="
 
 sleep 5
-CURRENT_IP=$(curl -s --socks5 127.0.0.1:9050 --max-time 15 https://api.ipify.org 2>/dev/null || echo "connecting...")
+CURRENT_IP=$(curl -s --socks5 127.0.0.1:9050 --max-time 15 https://icanhazip.com 2>/dev/null || echo "connecting...")
 log "Initial Tor exit IP: $CURRENT_IP"
 
 # Zero iptables counters at start
@@ -275,7 +275,7 @@ if [ -z "$SERVER_IP" ]; then
 fi
 
 # Get Tor exit IP
-TOR_IP=$(curl -s --socks5 127.0.0.1:9050 --max-time 10 https://api.ipify.org 2>/dev/null || echo "error")
+TOR_IP=$(curl -s --socks5 127.0.0.1:9050 --max-time 10 https://icanhazip.com 2>/dev/null || echo "error")
 
 echo ""
 echo "  🖥️  SERVER IP: $SERVER_IP"
@@ -309,10 +309,13 @@ cat > /usr/local/bin/helloworld-newip << 'NEWIP'
 echo "Requesting new Tor circuit..."
 (echo authenticate '""'; echo signal newnym; echo quit) | nc 127.0.0.1 9051 > /dev/null 2>&1
 sleep 3
-NEW_IP=$(curl -s --socks5 127.0.0.1:9050 --max-time 10 https://api.ipify.org)
+NEW_IP=$(curl -s --socks5 127.0.0.1:9050 --max-time 10 https://icanhazip.com)
 echo "New Tor exit IP: $NEW_IP"
 NEWIP
 chmod +x /usr/local/bin/helloworld-newip
+
+# All packages installed - disable exit-on-error for service starts
+set +e
 
 # Start everything
 echo ""
@@ -326,8 +329,11 @@ systemctl restart tor
 echo "Waiting for Tor to bootstrap (30s)..."
 sleep 30
 
-# Test Tor
-TOR_TEST=$(curl -s --socks5 127.0.0.1:9050 --max-time 15 https://api.ipify.org 2>/dev/null)
+# Test Tor (use multiple services to avoid rate limits)
+TOR_TEST=$(curl -s --socks5 127.0.0.1:9050 --max-time 10 https://icanhazip.com 2>/dev/null)
+if [ -z "$TOR_TEST" ]; then
+    TOR_TEST=$(curl -s --socks5 127.0.0.1:9050 --max-time 10 https://ifconfig.me 2>/dev/null)
+fi
 if [ -n "$TOR_TEST" ]; then
     echo "✅ Tor connected! Exit: $TOR_TEST"
 else
@@ -343,8 +349,8 @@ sleep 2
 /etc/helloworld/setup-tor-routing.sh
 
 # Kill any existing stunnel on 443
-pkill -9 stunnel 2>/dev/null
-fuser -k 443/tcp 2>/dev/null
+pkill -9 stunnel 2>/dev/null || true
+fuser -k 443/tcp 2>/dev/null || true
 sleep 1
 
 # Start stunnel
@@ -354,9 +360,6 @@ systemctl start helloworld-stunnel
 # Start rotator
 systemctl enable helloworld-tor-rotate
 systemctl start helloworld-tor-rotate
-
-# Disable exit-on-error for final output
-set +e
 
 # Final status
 echo ""
@@ -371,7 +374,10 @@ if [ -z "$SERVER_IP" ]; then
     SERVER_IP=$(curl -s --max-time 5 --noproxy '*' ifconfig.me 2>/dev/null || echo "unknown")
 fi
 
-TOR_IP=$(curl -s --socks5 127.0.0.1:9050 --max-time 10 https://api.ipify.org 2>/dev/null || echo "connecting...")
+TOR_IP=$(curl -s --socks5 127.0.0.1:9050 --max-time 10 https://icanhazip.com 2>/dev/null)
+if [ -z "$TOR_IP" ]; then
+    TOR_IP=$(curl -s --socks5 127.0.0.1:9050 --max-time 10 https://ifconfig.me 2>/dev/null || echo "connecting...")
+fi
 
 echo "🖥️  Server IP: $SERVER_IP (use in client config)"
 echo "🧅 Tor Exit:  $TOR_IP (your traffic appears here)"

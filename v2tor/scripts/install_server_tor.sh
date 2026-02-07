@@ -66,10 +66,15 @@ ControlPort 127.0.0.1:9051
 CookieAuthentication 0
 
 # Circuit rotation
-MaxCircuitDirtiness 60
-NewCircuitPeriod 60
-CircuitBuildTimeout 10
-NumEntryGuards 8
+MaxCircuitDirtiness 300
+NewCircuitPeriod 30
+CircuitBuildTimeout 15
+NumEntryGuards 3
+LearnCircuitBuildTimeout 1
+
+# Performance
+ConnectionPadding 0
+ReducedConnectionPadding 1
 
 # Logging
 Log notice file /var/log/tor/notices.log
@@ -154,8 +159,6 @@ chmod +x /etc/helloworld/setup-tor-routing.sh
 cat > /usr/local/bin/helloworld-tor-rotate << 'ROTATOR'
 #!/bin/bash
 ROTATE_AFTER=100
-REQUEST_COUNT=0
-LAST_CONNECTIONS=0
 LOG="/var/log/helloworld-tor-rotator.log"
 
 log() {
@@ -166,32 +169,33 @@ rotate_circuit() {
     (echo authenticate '""'; echo signal newnym; echo quit) | nc 127.0.0.1 9051 > /dev/null 2>&1
     sleep 2
     NEW_IP=$(curl -s --socks5 127.0.0.1:9050 --max-time 15 https://api.ipify.org 2>/dev/null || echo "rotating...")
-    log "🔄 ROTATED! New Tor exit IP: $NEW_IP"
+    log "🔄 ROTATED! New Tor exit IP: $NEW_IP (after $ROTATE_AFTER connections)"
+    # Reset iptables packet counters after rotation
+    iptables -t nat -Z REDSOCKS 2>/dev/null
 }
 
 log "========================================="
-log "Tor Rotator Started (every $ROTATE_AFTER requests)"
+log "Tor Rotator Started (every $ROTATE_AFTER connections)"
 log "========================================="
 
 sleep 5
 CURRENT_IP=$(curl -s --socks5 127.0.0.1:9050 --max-time 15 https://api.ipify.org 2>/dev/null || echo "connecting...")
 log "Initial Tor exit IP: $CURRENT_IP"
 
+# Zero iptables counters at start
+iptables -t nat -Z REDSOCKS 2>/dev/null
+
 while true; do
-    CURRENT_CONNECTIONS=$(ss -tn 2>/dev/null | grep -c ":22" || echo "0")
-    
-    if [ "$CURRENT_CONNECTIONS" -gt "$LAST_CONNECTIONS" ]; then
-        DIFF=$((CURRENT_CONNECTIONS - LAST_CONNECTIONS))
-        REQUEST_COUNT=$((REQUEST_COUNT + DIFF))
-    fi
-    LAST_CONNECTIONS=$CURRENT_CONNECTIONS
-    
-    if [ $REQUEST_COUNT -ge $ROTATE_AFTER ]; then
+    # Count TCP connections redirected through redsocks via iptables packet counter
+    CONN_COUNT=$(iptables -t nat -L REDSOCKS -v -n 2>/dev/null | grep "REDIRECT" | awk '{print $1}')
+    CONN_COUNT=${CONN_COUNT:-0}
+
+    if [ "$CONN_COUNT" -ge "$ROTATE_AFTER" ] 2>/dev/null; then
+        log "Reached $CONN_COUNT connections (threshold: $ROTATE_AFTER)"
         rotate_circuit
-        REQUEST_COUNT=0
     fi
-    
-    sleep 2
+
+    sleep 3
 done
 ROTATOR
 chmod +x /usr/local/bin/helloworld-tor-rotate
@@ -351,6 +355,9 @@ systemctl start helloworld-stunnel
 systemctl enable helloworld-tor-rotate
 systemctl start helloworld-tor-rotate
 
+# Disable exit-on-error for final output
+set +e
+
 # Final status
 echo ""
 echo "========================================"
@@ -358,9 +365,13 @@ echo "   Installation Complete!"
 echo "========================================"
 echo ""
 
-# Get server IP
+# Get REAL server IP from GCP metadata
 SERVER_IP=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip 2>/dev/null)
-TOR_IP=$(curl -s --socks5 127.0.0.1:9050 --max-time 10 https://api.ipify.org 2>/dev/null)
+if [ -z "$SERVER_IP" ]; then
+    SERVER_IP=$(curl -s --max-time 5 --noproxy '*' ifconfig.me 2>/dev/null || echo "unknown")
+fi
+
+TOR_IP=$(curl -s --socks5 127.0.0.1:9050 --max-time 10 https://api.ipify.org 2>/dev/null || echo "connecting...")
 
 echo "🖥️  Server IP: $SERVER_IP (use in client config)"
 echo "🧅 Tor Exit:  $TOR_IP (your traffic appears here)"
@@ -371,12 +382,15 @@ echo ""
 echo "Features:"
 echo "  ✅ Double encryption (TLS + SSH)"
 echo "  ✅ Traffic exits via Tor (not server IP)"
-echo "  ✅ IP rotates every 100 requests"
+echo "  ✅ IP rotates every 100 connections"
 echo "  ✅ Manual rotation: helloworld-newip"
 echo ""
 echo "Next steps:"
-echo "  1. Add SSH key: echo 'YOUR_KEY' >> ~/.ssh/authorized_keys"
-echo "  2. Set permissions: chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"
-echo "  3. Check status: helloworld-status"
+echo "  1. Add SSH key:"
+echo "     mkdir -p ~/.ssh && chmod 700 ~/.ssh"
+echo "     echo 'YOUR_KEY' >> ~/.ssh/authorized_keys"
+echo "     chmod 600 ~/.ssh/authorized_keys"
+echo ""
+echo "  2. Check status: helloworld-status"
 echo ""
 echo "========================================"
